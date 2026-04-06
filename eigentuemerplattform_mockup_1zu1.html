@@ -1,0 +1,780 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Eigentümerplattform Mockup</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+</head>
+<body class="bg-zinc-50">
+  <div id="root"></div>
+
+  <script type="text/babel">
+function EigentuemerplattformMockup() {
+  const React = window.React;
+  const { useMemo, useState } = React;
+
+  const scenarios = {
+    dashboard: [
+      {
+        id: "prio-1",
+        title: "Wasserschaden in Einheit 3",
+        subtitle: "Seit 2 Tagen offen · Priorität hoch",
+        next: "posteingang",
+        kind: "Schaden",
+      },
+      {
+        id: "prio-2",
+        title: "Rechnung 1.240 € ohne Ticketbezug",
+        subtitle: "Sanitär · manuelle Prüfung empfohlen",
+        next: "rechnung",
+        kind: "Rechnung",
+      },
+      {
+        id: "prio-3",
+        title: "Miete April fehlt in Einheit 5",
+        subtitle: "Wiederholt verspätete Zahlung",
+        next: "zahlung",
+        kind: "Zahlung",
+      },
+      {
+        id: "prio-4",
+        title: "2 Belege für Nebenkostenjahr fehlen",
+        subtitle: "Wartung Kellerbeleuchtung nicht gefunden",
+        next: "archiv",
+        kind: "Nebenkosten",
+      },
+    ],
+  };
+
+  const screens = [
+    "landing",
+    "onboarding",
+    "liegenschaft",
+    "migration",
+    "dashboard",
+    "posteingang",
+    "ticket",
+    "rechnung",
+    "zahlung",
+    "archiv",
+  ];
+
+  const [current, setCurrent] = useState("landing");
+  const [selectedMode, setSelectedMode] = useState("Self-Service");
+  const [usageType, setUsageType] = useState("Kleiner Bestand");
+  const [migration, setMigration] = useState("Aktive Kerndaten + Archiv");
+  const [stichtag, setStichtag] = useState("2027-01-01");
+  const [notifications, setNotifications] = useState([
+    "KI hat 4 priorisierte Vorgänge vorbereitet.",
+  ]);
+  const [ticketStatus, setTicketStatus] = useState("Neu");
+  const [invoiceDecision, setInvoiceDecision] = useState("Offen");
+  const [paymentAction, setPaymentAction] = useState("Keine Aktion");
+  const [searchText, setSearchText] = useState("Gab es schon einmal Schimmel in Einheit 3?");
+  const [mailAction, setMailAction] = useState("Entwurf vorbereitet");
+
+  const stepIndex = useMemo(() => screens.indexOf(current) + 1, [current]);
+
+  function go(screen) {
+    setCurrent(screen);
+  }
+
+  function addNote(text) {
+    setNotifications((prev) => [text, ...prev].slice(0, 5));
+  }
+
+  const Card = ({ children, className = "" }) => (
+    <div className={`rounded-3xl border border-zinc-200 bg-white shadow-sm ${className}`}>{children}</div>
+  );
+
+  const Button = ({ children, onClick, variant = "primary", className = "" }) => {
+    const styles =
+      variant === "primary"
+        ? "bg-zinc-900 text-white hover:bg-zinc-800"
+        : variant === "secondary"
+        ? "bg-zinc-100 text-zinc-900 hover:bg-zinc-200"
+        : "bg-white text-zinc-900 border border-zinc-300 hover:bg-zinc-50";
+    return (
+      <button
+        onClick={onClick}
+        className={`rounded-2xl px-4 py-2 text-sm font-medium transition ${styles} ${className}`}
+      >
+        {children}
+      </button>
+    );
+  };
+
+  const Badge = ({ children }) => (
+    <span className="rounded-full bg-zinc-100 px-3 py-1 text-xs font-medium text-zinc-700">{children}</span>
+  );
+
+  const SectionTitle = ({ title, subtitle }) => (
+    <div className="mb-4">
+      <h2 className="text-2xl font-semibold tracking-tight text-zinc-900">{title}</h2>
+      {subtitle && <p className="mt-1 text-sm text-zinc-600">{subtitle}</p>}
+    </div>
+  );
+
+  const KICard = ({ title, confidence = "mittel", points = [], actions = [] }) => (
+    <Card className="p-5">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div>
+          <div className="text-sm font-semibold text-zinc-900">KI-Vorschlag</div>
+          <div className="text-xs text-zinc-500">{title}</div>
+        </div>
+        <Badge>Sicherheit: {confidence}</Badge>
+      </div>
+      <div className="space-y-2 text-sm text-zinc-700">
+        {points.map((p, idx) => (
+          <div key={idx} className="rounded-2xl bg-zinc-50 px-3 py-2">
+            {p}
+          </div>
+        ))}
+      </div>
+      {actions.length > 0 && (
+        <div className="mt-4 flex flex-wrap gap-2">
+          {actions.map((a, idx) => (
+            <Button key={idx} variant={idx === 0 ? "primary" : "secondary"} onClick={a.onClick}>
+              {a.label}
+            </Button>
+          ))}
+        </div>
+      )}
+    </Card>
+  );
+
+  const Shell = ({ children }) => (
+    <div className="min-h-screen bg-zinc-50 text-zinc-900">
+      <div className="mx-auto grid max-w-7xl grid-cols-12 gap-6 px-4 py-6 lg:px-6">
+        <aside className="col-span-12 rounded-3xl border border-zinc-200 bg-white p-4 shadow-sm lg:col-span-3">
+          <div className="mb-6 flex items-center justify-between">
+            <div>
+              <div className="text-lg font-semibold">Eigentümerplattform</div>
+              <div className="text-xs text-zinc-500">Demo / Simulation</div>
+            </div>
+            <Badge>Step {stepIndex}/10</Badge>
+          </div>
+
+          <nav className="space-y-1">
+            {[
+              ["landing", "1. Einstieg"],
+              ["onboarding", "2. Onboarding"],
+              ["liegenschaft", "3. Liegenschaft"],
+              ["migration", "4. Migration"],
+              ["dashboard", "5. Dashboard"],
+              ["posteingang", "6. Posteingang"],
+              ["ticket", "7. Ticket"],
+              ["rechnung", "8. Rechnung"],
+              ["zahlung", "9. Zahlung"],
+              ["archiv", "10. Archiv / NK"],
+            ].map(([id, label]) => (
+              <button
+                key={id}
+                onClick={() => go(id)}
+                className={`w-full rounded-2xl px-3 py-2 text-left text-sm transition ${
+                  current === id ? "bg-zinc-900 text-white" : "text-zinc-700 hover:bg-zinc-100"
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+
+          <div className="mt-6 rounded-2xl bg-zinc-50 p-4">
+            <div className="text-sm font-semibold">Aktiver Kontext</div>
+            <div className="mt-2 space-y-2 text-sm text-zinc-600">
+              <div>Liegenschaft: Musterstraße 12, Berlin</div>
+              <div>Einheiten: 8 · Vermietet: 6</div>
+              <div>Modell: {selectedMode}</div>
+              <div>Migration: {migration}</div>
+            </div>
+          </div>
+
+          <div className="mt-6 rounded-2xl bg-zinc-50 p-4">
+            <div className="text-sm font-semibold">Letzte Systemhinweise</div>
+            <div className="mt-3 space-y-2 text-sm text-zinc-600">
+              {notifications.map((n, idx) => (
+                <div key={idx} className="rounded-xl bg-white px-3 py-2 border border-zinc-200">
+                  {n}
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
+        <main className="col-span-12 lg:col-span-9">{children}</main>
+      </div>
+    </div>
+  );
+
+  const TopBar = ({ title, subtitle, actions }) => (
+    <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <SectionTitle title={title} subtitle={subtitle} />
+      {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
+    </div>
+  );
+
+  function Landing() {
+    return (
+      <Shell>
+        <TopBar
+          title="Offene Infrastruktur für Eigentum und Wohnen"
+          subtitle="Klickbares Mockup für Selbstverwaltung, Kontrollzentrum und KI-Copilot in Routineprozessen."
+          actions={[
+            <Button key="demo" onClick={() => go("dashboard")}>Demo öffnen</Button>,
+          ]}
+        />
+
+        <div className="grid gap-6 lg:grid-cols-3">
+          {[
+            {
+              title: "Neue Liegenschaft anlegen",
+              text: "Für Eigentümer, kleine Bestände, Familienvermögen und kooperative Gemeinschaften.",
+              action: () => go("onboarding"),
+            },
+            {
+              title: "Bestehende Verwaltung kontrollieren",
+              text: "Rechnungen, Tickets, Fristen und Leistung externer Verwaltung sichtbar machen.",
+              action: () => {
+                setSelectedMode("Control Layer");
+                addNote("Control-Layer-Demo aktiviert.");
+                go("dashboard");
+              },
+            },
+            {
+              title: "Demo öffnen",
+              text: "Direkt in den laufenden Betrieb mit simulierten KI-Funktionen springen.",
+              action: () => go("dashboard"),
+            },
+          ].map((item) => (
+            <Card key={item.title} className="p-6">
+              <div className="mb-3 text-xl font-semibold">{item.title}</div>
+              <p className="mb-6 text-sm leading-6 text-zinc-600">{item.text}</p>
+              <div className="flex flex-wrap gap-2">
+                <Badge>Open Source</Badge>
+                <Badge>Selbst hostbar</Badge>
+                <Badge>KI als Copilot</Badge>
+              </div>
+              <Button className="mt-6" onClick={item.action}>Auswählen</Button>
+            </Card>
+          ))}
+        </div>
+      </Shell>
+    );
+  }
+
+  function Onboarding() {
+    return (
+      <Shell>
+        <TopBar
+          title="Onboarding-Assistent"
+          subtitle="Nutzungstyp, Stichtag und Migrationsweg bestimmen das empfohlene Setup."
+          actions={[
+            <Button key="back" variant="secondary" onClick={() => go("landing")}>Zurück</Button>,
+            <Button key="next" onClick={() => { addNote("Onboarding-Setup übernommen."); go("liegenschaft"); }}>Setup übernehmen</Button>,
+          ]}
+        />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2">
+            <div className="grid gap-5 md:grid-cols-2">
+              <label className="text-sm font-medium text-zinc-700">
+                Nutzungstyp
+                <select value={usageType} onChange={(e) => setUsageType(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm">
+                  <option>Kleiner Bestand</option>
+                  <option>Einzelnes Mietshaus</option>
+                  <option>Erbengemeinschaft</option>
+                  <option>Kleine Gemeinschaft / WEG-nahe Struktur</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                Betriebsmodell
+                <select value={selectedMode} onChange={(e) => setSelectedMode(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm">
+                  <option>Self-Service</option>
+                  <option>Control Layer</option>
+                  <option>Managed Light</option>
+                </select>
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                Stichtag
+                <input type="date" value={stichtag} onChange={(e) => setStichtag(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm" />
+              </label>
+              <label className="text-sm font-medium text-zinc-700">
+                Migrationsweg
+                <select value={migration} onChange={(e) => setMigration(e.target.value)} className="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm">
+                  <option>Neuaufbau</option>
+                  <option>Aktive Kerndaten + Archiv</option>
+                  <option>Import + Archiv</option>
+                </select>
+              </label>
+            </div>
+          </Card>
+
+          <KICard
+            title="Empfohlenes Setup"
+            confidence="hoch"
+            points={[
+              `Betriebsmodell: ${selectedMode}`,
+              `Nutzungstyp: ${usageType}`,
+              `Migration: ${migration}`,
+              "Module: Objektakte, Ticketing, Rechnungsprüfung, Dashboard",
+            ]}
+            actions={[
+              { label: "Empfehlung übernehmen", onClick: () => addNote("Empfohlenes Setup übernommen.") },
+              { label: "Details prüfen", onClick: () => addNote("Systemempfehlung geöffnet.") },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  function Liegenschaft() {
+    return (
+      <Shell>
+        <TopBar
+          title="Liegenschaft anlegen"
+          subtitle="Objektstammdaten, Einheitenstruktur und Dokumentenbereiche werden aufgebaut."
+          actions={[
+            <Button key="back" variant="secondary" onClick={() => go("onboarding")}>Zurück</Button>,
+            <Button key="next" onClick={() => { addNote("Liegenschaft gespeichert."); go("migration"); }}>Objekt speichern</Button>,
+          ]}
+        />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2">
+            <div className="grid gap-5 md:grid-cols-2">
+              {[
+                ["Adresse", "Musterstraße 12, Berlin"],
+                ["Gebäudeart", "Mehrfamilienhaus"],
+                ["Einheiten", "8"],
+                ["Vermietet", "6"],
+                ["Leerstand", "2"],
+                ["Bankkonto", "DE12 3456 7890 1234 5678 00"],
+              ].map(([label, value]) => (
+                <label key={label} className="text-sm font-medium text-zinc-700">
+                  {label}
+                  <input defaultValue={value} className="mt-2 w-full rounded-2xl border border-zinc-300 bg-white px-3 py-3 text-sm" />
+                </label>
+              ))}
+            </div>
+            <div className="mt-6 grid gap-3 md:grid-cols-2">
+              <Card className="p-4"><div className="text-sm font-semibold">Einheitenstruktur</div><div className="mt-2 text-sm text-zinc-600">WE 1–8 · Wohnnutzung · Zählerstruktur ergänzbar</div></Card>
+              <Card className="p-4"><div className="text-sm font-semibold">Dokumentenbereich</div><div className="mt-2 text-sm text-zinc-600">Verträge, Rechnungen, Versicherungen, Protokolle</div></Card>
+            </div>
+          </Card>
+          <KICard
+            title="Objektanalyse"
+            confidence="mittel"
+            points={[
+              "Einheitenstruktur vollständig erkannt",
+              "Empfehlung: Zählerstruktur für Heizung/Wasser ergänzen",
+              "Dokumentenlücken: Energieausweis, Versicherungsschein",
+            ]}
+            actions={[
+              { label: "Vorschläge übernehmen", onClick: () => addNote("KI-Vorschläge zur Objektanlage übernommen.") },
+              { label: "Später ergänzen", onClick: () => addNote("Dokumentenlücken bleiben als Aufgabe offen.") },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  function Migration() {
+    return (
+      <Shell>
+        <TopBar
+          title="Migration Light"
+          subtitle="Nur aktive Kerndaten werden operativ übernommen, Historie wandert ins Lesearchiv."
+          actions={[
+            <Button key="back" variant="secondary" onClick={() => go("liegenschaft")}>Zurück</Button>,
+            <Button key="next" onClick={() => { addNote("Kernimport erfolgreich ausgeführt."); go("dashboard"); }}>Import freigeben</Button>,
+          ]}
+        />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2">
+            <div className="grid gap-4 md:grid-cols-2">
+              {[
+                "CSV Mieterliste",
+                "Excel offene Posten",
+                "12 PDF-Verträge",
+                "45 Altbelege",
+              ].map((item) => (
+                <div key={item} className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-6 text-sm text-zinc-700">
+                  {item}
+                </div>
+              ))}
+            </div>
+            <div className="mt-6 rounded-2xl bg-zinc-50 p-4 text-sm text-zinc-700">
+              Importregeln: aktive Mietverhältnisse, offene Forderungen, relevante Dokumente und offene Tickets werden operativ übernommen.
+            </div>
+          </Card>
+          <KICard
+            title="Import-Auswertung"
+            confidence="hoch"
+            points={[
+              "6 aktive Mietverhältnisse erkannt",
+              "2 mögliche Dubletten in Mieterkontakten gefunden",
+              "45 Dokumente als Archiv klassifiziert",
+              "3 offene Forderungen importbereit",
+            ]}
+            actions={[
+              { label: "Dubletten prüfen", onClick: () => addNote("Dublettenprüfung geöffnet.") },
+              { label: "Archiv ansehen", onClick: () => addNote("Archivvorschau geöffnet.") },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  function Dashboard() {
+    return (
+      <Shell>
+        <TopBar
+          title="Dashboard / Kontrollzentrum"
+          subtitle="In unter zwei Minuten sehen, was Handlungsbedarf hat."
+          actions={[
+            <Button key="refresh" variant="secondary" onClick={() => addNote("Aufmerksamkeitsliste neu priorisiert.")}>Priorisieren</Button>,
+            <Button key="new" onClick={() => go("posteingang")}>Posteingang öffnen</Button>,
+          ]}
+        />
+        <div className="grid gap-6 xl:grid-cols-3">
+          <Card className="p-6 xl:col-span-2">
+            <div className="grid gap-4 md:grid-cols-5">
+              {[
+                ["Einheiten", "8"],
+                ["Vermietet", "6"],
+                ["Offene Vorgänge", "4"],
+                ["Mietrückstand", "1"],
+                ["Ungeprüfte Rechnungen", "2"],
+              ].map(([label, value]) => (
+                <div key={label} className="rounded-2xl bg-zinc-50 p-4">
+                  <div className="text-xs uppercase tracking-wide text-zinc-500">{label}</div>
+                  <div className="mt-2 text-2xl font-semibold">{value}</div>
+                </div>
+              ))}
+            </div>
+            <div className="mt-6">
+              <div className="mb-3 text-sm font-semibold">Was braucht heute Aufmerksamkeit?</div>
+              <div className="space-y-3">
+                {scenarios.dashboard.map((item) => (
+                  <button
+                    key={item.id}
+                    onClick={() => { addNote(`${item.kind} aus Dashboard geöffnet.`); go(item.next); }}
+                    className="w-full rounded-2xl border border-zinc-200 bg-white px-4 py-4 text-left hover:bg-zinc-50"
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <div className="font-medium">{item.title}</div>
+                        <div className="mt-1 text-sm text-zinc-500">{item.subtitle}</div>
+                      </div>
+                      <Badge>{item.kind}</Badge>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </Card>
+          <KICard
+            title="Tagespriorisierung"
+            confidence="hoch"
+            points={[
+              "1 akuter Schaden mit möglichem Folgerisiko",
+              "1 Rechnung mit Prüfhinweis",
+              "1 Mietrückstand mit Mustererkennung",
+              "1 Jahresvorgang mit fehlenden Belegen",
+            ]}
+            actions={[
+              { label: "Aufgabenliste anzeigen", onClick: () => addNote("Aufgabenliste angezeigt.") },
+              { label: "Dashboard filtern", onClick: () => addNote("Filterdialog geöffnet.") },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  function Posteingang() {
+    return (
+      <Shell>
+        <TopBar
+          title="KI-Posteingang"
+          subtitle="Mietanliegen klassifizieren, fehlende Angaben nachfordern und in Tickets überführen."
+          actions={[
+            <Button key="back" variant="secondary" onClick={() => go("dashboard")}>Zum Dashboard</Button>,
+            <Button key="next" onClick={() => { addNote("Ticket aus Nachricht vorbereitet."); go("ticket"); }}>Ticket anlegen</Button>,
+          ]}
+        />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2">
+            <div className="grid gap-4 lg:grid-cols-[260px_1fr]">
+              <div className="rounded-2xl bg-zinc-50 p-3">
+                <div className="mb-3 text-sm font-semibold">Eingang</div>
+                <div className="rounded-2xl border border-zinc-200 bg-white p-3">
+                  <div className="font-medium">Herr Alkan · Einheit 3</div>
+                  <div className="mt-1 text-sm text-zinc-600">Heizung kalt und Wasser tropft im Bad.</div>
+                </div>
+              </div>
+              <div>
+                <div className="rounded-2xl border border-zinc-200 bg-white p-4">
+                  <div className="text-sm font-semibold">Nachricht</div>
+                  <p className="mt-3 text-sm leading-6 text-zinc-700">
+                    Hallo, die Heizung bleibt kalt und im Bad tropft seit gestern Wasser. Bitte um schnelle Rückmeldung.
+                  </p>
+                </div>
+                <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4">
+                  <div className="text-sm font-semibold">Antwortentwurf</div>
+                  <textarea value={`Vielen Dank für Ihre Meldung. Wir prüfen den Fall mit hoher Priorität und melden uns kurzfristig mit dem nächsten Schritt. ${mailAction}.`} readOnly className="mt-3 min-h-[120px] w-full rounded-2xl border border-zinc-300 px-3 py-3 text-sm" />
+                </div>
+              </div>
+            </div>
+          </Card>
+          <KICard
+            title="Nachrichtenauswertung"
+            confidence="hoch"
+            points={[
+              "Kategorie: Schaden",
+              "Unterkategorie: Heizung / Sanitär",
+              "Priorität: hoch",
+              "Fehlende Info: Ist die gesamte Wohnung betroffen?",
+            ]}
+            actions={[
+              { label: "Antwort übernehmen", onClick: () => { setMailAction("Entwurf freigegeben"); addNote("Antwortentwurf übernommen."); } },
+              { label: "Rückfrage ergänzen", onClick: () => { setMailAction("Zusatzfrage ergänzt"); addNote("Rückfrage zur Betroffenheit ergänzt."); } },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  function Ticket() {
+    return (
+      <Shell>
+        <TopBar
+          title="Schaden / Ticketprozess"
+          subtitle="Dringlichkeit bewerten, Gewerk vorschlagen und Maßnahme freigeben."
+          actions={[
+            <Button key="back" variant="secondary" onClick={() => go("posteingang")}>Zurück</Button>,
+            <Button key="next" onClick={() => { setTicketStatus("Beauftragt"); addNote("Dienstleister beauftragt und Mieter informiert."); }}>Dienstleister beauftragen</Button>,
+          ]}
+        />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Badge>Ticketstatus: {ticketStatus}</Badge>
+              <Badge>Einheit 3</Badge>
+              <Badge>Mieter: Herr Alkan</Badge>
+            </div>
+            <div className="mt-5 grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl bg-zinc-50 p-4">
+                <div className="text-sm font-semibold">Schadendetails</div>
+                <div className="mt-2 text-sm text-zinc-600">Heizung kalt, Wasser tropft im Bad seit gestern.</div>
+                <div className="mt-4 rounded-2xl border border-dashed border-zinc-300 bg-white px-4 py-10 text-center text-sm text-zinc-500">Foto-Platzhalter</div>
+              </div>
+              <div className="rounded-2xl bg-zinc-50 p-4">
+                <div className="text-sm font-semibold">Vorgangshistorie</div>
+                <div className="mt-2 space-y-2 text-sm text-zinc-600">
+                  <div>Vor 14 Monaten ähnlicher Sanitärfall in Einheit 3</div>
+                  <div>Heute 09:14 Uhr: Eingangskanal E-Mail</div>
+                  <div>Heute 09:16 Uhr: Ticket durch KI vorbereitet</div>
+                </div>
+              </div>
+            </div>
+          </Card>
+          <KICard
+            title="Schadenbewertung"
+            confidence="mittel"
+            points={[
+              "Vermuteter Schadentyp: Leckage Sanitär",
+              "Dringlichkeit: hoch",
+              "Empfohlenes Gewerk: Sanitär / Heizung",
+              "Vorgeschlagener Dienstleister: Meier Haustechnik",
+            ]}
+            actions={[
+              { label: "Meier Haustechnik wählen", onClick: () => addNote("Dienstleister Meier Haustechnik vorgeschlagen.") },
+              { label: "Statusupdate senden", onClick: () => addNote("Statusupdate an Mieter vorbereitet.") },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  function Rechnung() {
+    return (
+      <Shell>
+        <TopBar
+          title="Rechnungen und Belegprüfung"
+          subtitle="Rechnung lesen, Kontext zuordnen und Auffälligkeiten sichtbar machen."
+          actions={[
+            <Button key="back" variant="secondary" onClick={() => go("dashboard")}>Zum Dashboard</Button>,
+            <Button key="next" onClick={() => { setInvoiceDecision("Manuelle Prüfung"); addNote("Rechnung zur manuellen Prüfung markiert."); }}>Prüfung markieren</Button>,
+          ]}
+        />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2">
+            <div className="grid gap-4 md:grid-cols-[1fr_320px]">
+              <div className="rounded-2xl border border-dashed border-zinc-300 bg-zinc-50 px-4 py-16 text-center text-sm text-zinc-500">PDF-Vorschau der Rechnung</div>
+              <div className="rounded-2xl bg-zinc-50 p-4">
+                <div className="text-sm font-semibold">Extrahierte Felder</div>
+                <div className="mt-3 space-y-2 text-sm text-zinc-600">
+                  <div>Betrag: 1.240 €</div>
+                  <div>Gewerk: Sanitär</div>
+                  <div>Objekt: Musterstraße 12</div>
+                  <div>Leistungszeitraum: 03.04.2027</div>
+                  <div>Status: {invoiceDecision}</div>
+                </div>
+              </div>
+            </div>
+          </Card>
+          <KICard
+            title="Rechnungsanalyse"
+            confidence="mittel"
+            points={[
+              "Objektbezug erkannt",
+              "Kein eindeutiger Ticketbezug gefunden",
+              "Preis 18 % über vergleichbarem Vorjahresfall",
+              "Empfehlung: manuelle Prüfung vor Freigabe",
+            ]}
+            actions={[
+              { label: "Ticket zuordnen", onClick: () => addNote("Dialog zur Ticketzuordnung geöffnet.") },
+              { label: "Rückfrage an Dienstleister", onClick: () => addNote("Rückfrage an Dienstleister vorbereitet.") },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  function Zahlung() {
+    return (
+      <Shell>
+        <TopBar
+          title="Zahlungsmonitoring und Mahnwesen"
+          subtitle="Rückstände erkennen, Zahlungsmuster markieren und nächste Aktion vorbereiten."
+          actions={[
+            <Button key="back" variant="secondary" onClick={() => go("dashboard")}>Zum Dashboard</Button>,
+            <Button key="next" onClick={() => { setPaymentAction("Freundliche Erinnerung gesendet"); addNote("Freundliche Zahlungserinnerung versendet."); }}>Erinnerung senden</Button>,
+          ]}
+        />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2">
+            <div className="grid gap-4 md:grid-cols-2">
+              <div className="rounded-2xl bg-zinc-50 p-4">
+                <div className="text-sm font-semibold">Offene Posten</div>
+                <div className="mt-3 text-sm text-zinc-600">Einheit 5 · April-Miete offen · 850 €</div>
+                <div className="mt-2 text-sm text-zinc-600">Frühere verspätete Zahlungen: 2 in den letzten 4 Monaten</div>
+              </div>
+              <div className="rounded-2xl bg-zinc-50 p-4">
+                <div className="text-sm font-semibold">Maßnahmenstatus</div>
+                <div className="mt-3 text-sm text-zinc-600">Aktuelle Aktion: {paymentAction}</div>
+              </div>
+            </div>
+            <div className="mt-4 rounded-2xl border border-zinc-200 bg-white p-4">
+              <div className="text-sm font-semibold">Kommunikationsentwurf</div>
+              <textarea readOnly value="Guten Tag, für die Einheit 5 konnten wir bislang keinen Zahlungseingang für April zuordnen. Bitte prüfen Sie den Betrag von 850 €. Vielen Dank." className="mt-3 min-h-[120px] w-full rounded-2xl border border-zinc-300 px-3 py-3 text-sm" />
+            </div>
+          </Card>
+          <KICard
+            title="Zahlungsmuster"
+            confidence="hoch"
+            points={[
+              "Wiederholt verspätete Zahlung erkannt",
+              "Empfohlene Aktion: freundliche Erinnerung",
+              "Keine automatische rechtliche Eskalation",
+              "Vorgang in Beobachtung behalten",
+            ]}
+            actions={[
+              { label: "Mahnstufe setzen", onClick: () => { setPaymentAction("Mahnstufe 1 gesetzt"); addNote("Mahnstufe 1 gesetzt."); } },
+              { label: "Notiz ergänzen", onClick: () => addNote("Interne Notiz zum Zahlungsvorgang ergänzt.") },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  function Archiv() {
+    const searchResult = searchText.toLowerCase().includes("schimmel")
+      ? [
+          "1 historischer Vorgang in Einheit 3 gefunden",
+          "Meldung vom 12.02.2025",
+          "Maßnahme: Lüftungsprüfung und Malerarbeit",
+          "Zugehörige Rechnung und Kommunikation vorhanden",
+        ]
+      : [
+          "Abrechnungsentwurf vorbereitet",
+          "Heizkosten +12 % gegenüber Vorjahr",
+          "2 Positionen mit Prüfhinweis",
+          "Beleglücke: Wartung Kellerbeleuchtung fehlt",
+        ];
+
+    return (
+      <Shell>
+        <TopBar
+          title="Objektakte / Archiv / Nebenkosten"
+          subtitle="Historie, Belege und Jahreslogik werden in einem Wissensscreen zusammengeführt."
+          actions={[
+            <Button key="back" variant="secondary" onClick={() => go("dashboard")}>Zum Dashboard</Button>,
+            <Button key="next" onClick={() => addNote("Archivvorgang mit aktuellem Fall verknüpft.")}>Vorgang verknüpfen</Button>,
+          ]}
+        />
+        <div className="grid gap-6 lg:grid-cols-3">
+          <Card className="p-6 lg:col-span-2">
+            <div className="flex flex-wrap items-center gap-3">
+              <input
+                value={searchText}
+                onChange={(e) => setSearchText(e.target.value)}
+                className="min-w-[280px] flex-1 rounded-2xl border border-zinc-300 bg-white px-4 py-3 text-sm"
+              />
+              <Button variant="secondary" onClick={() => addNote("Suche in Objektakte ausgeführt.")}>Suche ausführen</Button>
+            </div>
+            <div className="mt-6 grid gap-4 md:grid-cols-3">
+              {[
+                ["Objektakte", "Versicherungen, Protokolle, Verträge, Rechnungen"],
+                ["Nebenkosten", "Kostenarten, Schlüssel, Entwürfe, Vorjahresvergleich"],
+                ["Historie", "Frühere Schäden, Kommunikation, Maßnahmen"],
+              ].map(([title, text]) => (
+                <div key={title} className="rounded-2xl bg-zinc-50 p-4">
+                  <div className="text-sm font-semibold">{title}</div>
+                  <div className="mt-2 text-sm text-zinc-600">{text}</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+          <KICard
+            title="Such- und Prüfresultat"
+            confidence="mittel"
+            points={searchResult}
+            actions={[
+              { label: "Dokument öffnen", onClick: () => addNote("Archivdokument geöffnet.") },
+              { label: "Entwurf prüfen", onClick: () => addNote("Nebenkostenentwurf geprüft.") },
+            ]}
+          />
+        </div>
+      </Shell>
+    );
+  }
+
+  if (current === "landing") return <Landing />;
+  if (current === "onboarding") return <Onboarding />;
+  if (current === "liegenschaft") return <Liegenschaft />;
+  if (current === "migration") return <Migration />;
+  if (current === "dashboard") return <Dashboard />;
+  if (current === "posteingang") return <Posteingang />;
+  if (current === "ticket") return <Ticket />;
+  if (current === "rechnung") return <Rechnung />;
+  if (current === "zahlung") return <Zahlung />;
+  return <Archiv />;
+}
+
+const root = ReactDOM.createRoot(document.getElementById('root'));
+root.render(<EigentuemerplattformMockup />);
+  </script>
+</body>
+</html>

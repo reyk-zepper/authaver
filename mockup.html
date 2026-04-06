@@ -1,0 +1,1153 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Authaver – KI-gestützte Hausverwaltung</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; }
+    @keyframes pulse-dot { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .pulse-dot { animation: pulse-dot 2s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-slate-50">
+  <div id="root"></div>
+  <script type="text/babel">
+  const { useState } = React;
+
+  // ── DATA ─────────────────────────────────────────────────────────────────
+
+  const PROPERTY = {
+    name: 'Bergstraße 14', city: 'München',
+    units: 12, occupied: 10, vacant: 2,
+    monthlyRent: 14800,
+  };
+
+  const AGENTS = [
+    {
+      id: 'paula', name: 'Paula', role: 'Posteingang-Assistentin',
+      desc: 'Liest, klassifiziert und priorisiert alle eingehenden E-Mails und Dokumente automatisch. Eskaliert dringende Vorgänge sofort.',
+      status: 'active',
+      lastAction: 'Vor 4 Min. · Rechnung Köstler als Priorität markiert',
+      budget: 34, processed: 847, unit: 'E-Mails',
+      heartbeat: 'Alle 15 Min.',
+    },
+    {
+      id: 'rex', name: 'Rex', role: 'Rechnungsprüfer',
+      desc: 'Gleicht eingehende Rechnungen mit offenen Tickets ab. Flaggt Abweichungen und schlägt Buchungen vor.',
+      status: 'waiting',
+      lastAction: 'Vor 12 Min. · Sanitärrechnung ohne Ticketbezug geflaggt',
+      budget: 12, processed: 156, unit: 'Rechnungen',
+      heartbeat: 'Bei Eingang',
+    },
+    {
+      id: 'max', name: 'Max', role: 'Mahnwesen',
+      desc: 'Überwacht alle Zahlungseingänge und erstellt bei Rückstand automatisch Mahnungsentwürfe zur Freigabe.',
+      status: 'active',
+      lastAction: 'Heute, 07:00 · Mahnung WE 5 (Fischer) vorbereitet',
+      budget: 8, processed: 34, unit: 'Mahnungen geprüft',
+      heartbeat: 'Täglich 07:00',
+    },
+    {
+      id: 'diana', name: 'Diana', role: 'Dokumenten-Archivarin',
+      desc: 'Verarbeitet und archiviert alle eingehenden Dokumente. Erkennt Dokumentenlücken und fordert fehlende Belege an.',
+      status: 'active',
+      lastAction: 'Gestern, 23:11 · Heizkostenabrechnung Q1 archiviert',
+      budget: 21, processed: 445, unit: 'Dokumente',
+      heartbeat: 'Bei Eingang',
+    },
+    {
+      id: 'zara', name: 'Zara', role: 'Zahlungsmonitor',
+      desc: 'Gleicht täglich Kontoauszüge mit erwarteten Zahlungseingängen ab. Meldet Abweichungen sofort an die Orchestratorin.',
+      status: 'alert',
+      lastAction: 'Heute, 06:00 · ALARM: Miete März WE 5 nicht eingegangen',
+      budget: 15, processed: 92, unit: 'Kontoauszüge',
+      heartbeat: 'Täglich 06:00',
+    },
+  ];
+
+  const EMAILS = [
+    {
+      id: 'e1', from: 'Köstler Handwerk GmbH', email: 'service@koestler-handwerk.de',
+      subject: 'Rechnung #2025-089 – Sanitärarbeiten Bergstraße 14',
+      time: 'Heute, 08:34', urgent: true,
+      badge: 'Rechnung', badgeColor: 'amber',
+      preview: 'Sehr geehrter Eigentümer, anbei erhalten Sie unsere Rechnung für die durchgeführten Sanitärarbeiten vom 28.03. in Höhe von 2.340,00 €. Wir bitten um Überweisung bis zum 30.04.2025.',
+      aiNote: 'Kein offenes Ticket für Sanitärarbeiten im März gefunden. Betrag liegt 18 % über Vergleichswert. Manuelle Prüfung empfohlen.',
+    },
+    {
+      id: 'e2', from: 'Sarah Fischer', email: 's.fischer@gmx.de',
+      subject: 'Mietzahlung März – kurze Info',
+      time: 'Gestern, 19:11', urgent: true,
+      badge: 'Anfrage · Miete', badgeColor: 'red',
+      preview: 'Guten Tag, ich wollte kurz Bescheid geben, dass sich meine Zahlung leider noch etwas verzögert. Ich überweise die Märzmiete bis spätestens Freitag dieser Woche. Bitte entschuldigen Sie die Unannehmlichkeiten.',
+      aiNote: 'Dritte verspätete Zahlung in 6 Monaten (Jan, Feb, Mrz). Mahnung durch Max vorbereitet – wartet auf Freigabe.',
+    },
+    {
+      id: 'e3', from: 'Stadtwerke München', email: 'service@stadtwerke-muenchen.de',
+      subject: 'Ihre Heizkostenabrechnung Q1 2025 – Bergstraße 14',
+      time: 'Gestern, 12:00', urgent: false,
+      badge: 'Beleg · Nebenkosten', badgeColor: 'blue',
+      preview: 'Ihre Heizkostenabrechnung für das erste Quartal 2025 liegt bereit. Gesamtverbrauch: 28.450 kWh. Gesamtbetrag: 6.890,00 €. Die Abrechnung wurde automatisch übermittelt.',
+      aiNote: 'Automatisch als Nebenkostenbeleg 2025 archiviert. Verbrauch liegt 4 % unter Vorjahreszeitraum.',
+    },
+    {
+      id: 'e4', from: 'Dr. Anna Vogel', email: 'a.vogel@gmail.com',
+      subject: 'Reparaturwunsch – Fensterdichtung WE 3',
+      time: 'Mo., 14:23', urgent: false,
+      badge: 'Ticket · Wartung', badgeColor: 'indigo',
+      preview: 'Sehr geehrte Damen und Herren, ich bitte um Prüfung der Fensterdichtung im Schlafzimmer der Einheit 3. Es zieht merklich, besonders bei Wind. Ich befürchte Wärmeverlust und bitte um baldige Behebung.',
+      aiNote: 'Ticket #24-089 automatisch erstellt. Hausmeister per E-Mail benachrichtigt. Priorität: Normal.',
+    },
+    {
+      id: 'e5', from: 'Allianz Versicherung', email: 'schadenmeldung@allianz.de',
+      subject: 'Bestätigung Wasserschaden – Schaden-Nr. 2025-M-44521',
+      time: 'So., 09:55', urgent: false,
+      badge: 'Bestätigung · Versicherung', badgeColor: 'emerald',
+      preview: 'Wir bestätigen den Eingang Ihrer Schadensmeldung zum Wasserschaden in Einheit 8, Bergstraße 14. Ein Sachverständiger wird sich innerhalb von 48 Stunden zur Terminvereinbarung melden.',
+      aiNote: 'Mit Ticket #24-087 (Wasserschaden WE 8) verknüpft. Gutachtertermin ausstehend – Erinnerung für morgen gesetzt.',
+    },
+  ];
+
+  const PRIORITIES = [
+    {
+      id: 'p1', urgency: 'high', kind: 'Schaden',
+      title: 'Wasserschaden Einheit 8 · Familie Hoffmann',
+      subtitle: 'Rohrbruch · Seit 3 Tagen offen · Gutachtertermin ausstehend',
+      screen: 'ticket',
+    },
+    {
+      id: 'p2', urgency: 'medium', kind: 'Rechnung',
+      title: 'Rechnung 2.340 € ohne Ticketbezug',
+      subtitle: 'Köstler Handwerk · Sanitär · Manuelle Prüfung empfohlen',
+      screen: 'rechnung',
+    },
+    {
+      id: 'p3', urgency: 'medium', kind: 'Zahlung',
+      title: 'Miete März fehlt · WE 5 · Sarah Fischer',
+      subtitle: 'Dritter Rückstand in 6 Monaten · Mahnung vorbereitet',
+      screen: 'posteingang',
+    },
+    {
+      id: 'p4', urgency: 'low', kind: 'Nebenkosten',
+      title: '2 Belege für Nebenkostenjahr 2024 fehlen',
+      subtitle: 'Wartung Kellerbeleuchtung + Treppenreinigung Dez.',
+      screen: 'archiv',
+    },
+  ];
+
+  // ── DESIGN TOKENS ─────────────────────────────────────────────────────
+
+  const urgencyStyle = {
+    high:   { bg: 'bg-red-50',    border: 'border-red-200',    text: 'text-red-700',    dot: 'bg-red-500',    label: 'Dringend', pulse: true },
+    medium: { bg: 'bg-amber-50',  border: 'border-amber-200',  text: 'text-amber-700',  dot: 'bg-amber-500',  label: 'Mittel',   pulse: false },
+    low:    { bg: 'bg-blue-50',   border: 'border-blue-200',   text: 'text-blue-700',   dot: 'bg-blue-400',   label: 'Info',     pulse: false },
+  };
+
+  const badgeStyle = {
+    amber:   'bg-amber-50 text-amber-700 border border-amber-200',
+    red:     'bg-red-50 text-red-700 border border-red-200',
+    blue:    'bg-blue-50 text-blue-700 border border-blue-200',
+    indigo:  'bg-indigo-50 text-indigo-700 border border-indigo-200',
+    emerald: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+    slate:   'bg-slate-100 text-slate-600 border border-slate-200',
+    purple:  'bg-purple-50 text-purple-700 border border-purple-200',
+  };
+
+  const agentStatusCfg = {
+    active:  { label: 'Aktiv',   dot: 'bg-emerald-500', pulse: true },
+    waiting: { label: 'Wartend', dot: 'bg-amber-400',   pulse: false },
+    alert:   { label: 'Alarm',   dot: 'bg-red-500',     pulse: true },
+    idle:    { label: 'Inaktiv', dot: 'bg-slate-300',   pulse: false },
+  };
+
+  // ── BASE COMPONENTS ───────────────────────────────────────────────────
+
+  const StatusDot = ({ status }) => {
+    const s = agentStatusCfg[status];
+    return (
+      <span className="flex items-center gap-1.5">
+        <span className={`inline-block w-2 h-2 rounded-full ${s.dot} ${s.pulse ? 'pulse-dot' : ''}`} />
+        <span className="text-xs text-slate-500">{s.label}</span>
+      </span>
+    );
+  };
+
+  const Badge = ({ color = 'slate', children }) => (
+    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium whitespace-nowrap ${badgeStyle[color]}`}>
+      {children}
+    </span>
+  );
+
+  const Btn = ({ variant = 'primary', onClick, children, sm = false, disabled = false }) => {
+    const base = `inline-flex items-center justify-center font-medium rounded-xl transition-all cursor-pointer disabled:opacity-50 ${sm ? 'text-xs px-3 py-1.5' : 'text-sm px-4 py-2'}`;
+    const variants = {
+      primary:   'bg-indigo-600 text-white hover:bg-indigo-700 shadow-sm',
+      secondary: 'bg-white text-slate-700 border border-slate-300 hover:bg-slate-50',
+      ghost:     'text-slate-600 hover:bg-slate-100',
+      danger:    'bg-red-600 text-white hover:bg-red-700 shadow-sm',
+      success:   'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm',
+    };
+    return (
+      <button onClick={onClick} disabled={disabled} className={`${base} ${variants[variant]}`}>
+        {children}
+      </button>
+    );
+  };
+
+  const Card = ({ children, className = '', onClick }) => (
+    <div onClick={onClick} className={`bg-white rounded-2xl border border-slate-200 ${className} ${onClick ? 'cursor-pointer' : ''}`}>
+      {children}
+    </div>
+  );
+
+  const KIBox = ({ confidence = 'hoch', title, points = [], actions = [] }) => {
+    const confColor = { hoch: 'emerald', mittel: 'amber', niedrig: 'red' };
+    return (
+      <Card className="p-5">
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <div>
+            <div className="text-xs font-semibold text-indigo-600 uppercase tracking-wider mb-0.5">KI-Vorschlag</div>
+            <div className="text-sm font-medium text-slate-800 leading-snug">{title}</div>
+          </div>
+          <Badge color={confColor[confidence]}>Konfidenz: {confidence}</Badge>
+        </div>
+        <div className="space-y-1.5 mb-4">
+          {points.map((p, i) => (
+            <div key={i} className="flex items-start gap-2 text-sm text-slate-700 bg-slate-50 rounded-xl px-3 py-2">
+              <span className="text-indigo-400 flex-shrink-0 mt-0.5">›</span>
+              <span>{p}</span>
+            </div>
+          ))}
+        </div>
+        {actions.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-3 border-t border-slate-100">
+            {actions.map((a, i) => (
+              <Btn key={i} variant={i === 0 ? 'primary' : 'secondary'} sm onClick={a.onClick}>{a.label}</Btn>
+            ))}
+          </div>
+        )}
+      </Card>
+    );
+  };
+
+  // ── NAVIGATION ────────────────────────────────────────────────────────
+
+  const NAV_ITEMS = [
+    { id: 'landing',     label: 'Einstieg',     emoji: '⌂' },
+    { id: 'dashboard',   label: 'Dashboard',    emoji: '◈' },
+    { id: 'agenten',     label: 'KI-Agenten',   emoji: '◉' },
+    { id: 'posteingang', label: 'Posteingang',  emoji: '✉' },
+    { id: 'ticket',      label: 'Tickets',      emoji: '◷' },
+    { id: 'rechnung',    label: 'Rechnungen',   emoji: '◎' },
+    { id: 'archiv',      label: 'Archiv / NK',  emoji: '▦' },
+  ];
+
+  const Sidebar = ({ current, go }) => {
+    const alertCount = AGENTS.filter(a => a.status === 'alert').length;
+    return (
+      <aside className="fixed left-0 top-0 h-full w-60 bg-white border-r border-slate-200 flex flex-col z-20">
+        {/* Logo */}
+        <div className="px-5 py-4 border-b border-slate-100">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm shadow-sm">A</div>
+            <div>
+              <div className="text-sm font-semibold text-slate-900">Authaver</div>
+              <div className="text-xs text-slate-400">Demo · v0.1-alpha</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Property selector */}
+        <div className="px-3 py-3 border-b border-slate-100">
+          <button className="w-full flex items-center gap-2 px-3 py-2.5 rounded-xl bg-slate-50 hover:bg-slate-100 transition-all text-left">
+            <div className="w-7 h-7 rounded-lg bg-indigo-100 text-indigo-700 flex items-center justify-center text-xs font-bold flex-shrink-0">B</div>
+            <div className="flex-1 min-w-0">
+              <div className="text-xs font-medium text-slate-900 truncate">{PROPERTY.name}</div>
+              <div className="text-xs text-slate-400">{PROPERTY.city} · {PROPERTY.units} Einheiten</div>
+            </div>
+            <span className="text-slate-400 text-xs flex-shrink-0">▾</span>
+          </button>
+        </div>
+
+        {/* Nav */}
+        <nav className="flex-1 px-3 py-3 space-y-0.5 overflow-y-auto">
+          {NAV_ITEMS.map(item => {
+            const active = current === item.id;
+            const showAlert = item.id === 'agenten' && alertCount > 0;
+            return (
+              <button
+                key={item.id}
+                onClick={() => go(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2 rounded-xl text-sm transition-all text-left group ${
+                  active ? 'bg-indigo-50 text-indigo-700 font-medium' : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
+                }`}
+              >
+                <span className={`text-base transition-all ${active ? 'text-indigo-600' : 'text-slate-400 group-hover:text-slate-600'}`}>{item.emoji}</span>
+                <span className="flex-1">{item.label}</span>
+                {showAlert && <span className="w-2 h-2 rounded-full bg-red-500 pulse-dot" />}
+              </button>
+            );
+          })}
+        </nav>
+
+        {/* Agent status footer */}
+        <div className="px-4 py-4 border-t border-slate-100">
+          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2.5">Agenten-Status</div>
+          <div className="space-y-2">
+            {AGENTS.map(a => (
+              <div key={a.id} className="flex items-center justify-between">
+                <span className="text-xs text-slate-600">{a.name} · {a.role.split('-')[0]}</span>
+                <StatusDot status={a.status} />
+              </div>
+            ))}
+          </div>
+        </div>
+      </aside>
+    );
+  };
+
+  // ── SHELL ─────────────────────────────────────────────────────────────
+
+  const Shell = ({ current, go, children }) => (
+    <div className="min-h-screen bg-slate-50">
+      <Sidebar current={current} go={go} />
+      <main className="ml-60">{children}</main>
+    </div>
+  );
+
+  const TopBar = ({ title, subtitle, badge, actions }) => (
+    <div className="sticky top-0 z-10 bg-white/90 backdrop-blur-sm border-b border-slate-200 px-8 py-4">
+      <div className="flex items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-lg font-semibold text-slate-900 truncate">{title}</h1>
+            {badge && <Badge color={badge.color}>{badge.label}</Badge>}
+          </div>
+          {subtitle && <p className="text-sm text-slate-400 mt-0.5">{subtitle}</p>}
+        </div>
+        {actions && <div className="flex items-center gap-2 flex-shrink-0">{actions}</div>}
+      </div>
+    </div>
+  );
+
+  const Page = ({ children, wide = false }) => (
+    <div className={`px-8 py-6 ${wide ? 'max-w-7xl' : 'max-w-5xl'}`}>{children}</div>
+  );
+
+  // ── SCREENS ───────────────────────────────────────────────────────────
+
+  function Landing({ go }) {
+    return (
+      <div className="min-h-screen bg-white">
+        {/* Top bar */}
+        <div className="border-b border-slate-100 px-8 py-4 flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-bold text-sm">A</div>
+            <span className="text-sm font-semibold text-slate-900">Authaver</span>
+            <Badge color="indigo">Open Source · MIT</Badge>
+          </div>
+          <div className="flex items-center gap-2">
+            <Btn variant="secondary" sm onClick={() => go('agenten')}>KI-Agenten ansehen</Btn>
+            <Btn sm onClick={() => go('dashboard')}>Demo öffnen →</Btn>
+          </div>
+        </div>
+
+        {/* Hero */}
+        <div className="max-w-5xl mx-auto px-8 py-20 text-center">
+          <div className="inline-flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-full px-4 py-1.5 text-xs text-indigo-700 font-medium mb-8">
+            ◉ KI-Agenten arbeiten automatisch im Hintergrund
+          </div>
+          <h1 className="text-5xl font-bold text-slate-900 leading-tight mb-6">
+            Dein Eigentum.<br />
+            Deine Kontrolle.<br />
+            <span className="text-indigo-600">KI erledigt den Rest.</span>
+          </h1>
+          <p className="text-xl text-slate-500 max-w-2xl mx-auto leading-relaxed mb-10">
+            Authaver ist eine open-source, selbst-hostbare Hausverwaltungsplattform.
+            KI-Agenten verarbeiten Posteingang, prüfen Rechnungen und überwachen Zahlungen —
+            du entscheidest nur noch bei Ausnahmen.
+          </p>
+          <div className="flex items-center justify-center gap-3 mb-12">
+            <Btn onClick={() => go('dashboard')}>Demo öffnen →</Btn>
+            <Btn variant="secondary" onClick={() => go('agenten')}>KI-Agenten kennenlernen</Btn>
+          </div>
+
+          {/* Key metrics */}
+          <div className="grid grid-cols-4 gap-4 max-w-2xl mx-auto">
+            {[
+              { value: '< 2 Min.', label: 'täglicher Aufwand' },
+              { value: '5 Agenten', label: 'rund um die Uhr' },
+              { value: '100%', label: 'selbst hostbar' },
+              { value: '0 €', label: 'monatliche Gebühren' },
+            ].map(m => (
+              <div key={m.label} className="bg-slate-50 rounded-2xl p-4">
+                <div className="text-xl font-bold text-slate-900">{m.value}</div>
+                <div className="text-xs text-slate-500 mt-0.5">{m.label}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Use cases */}
+        <div className="bg-slate-50 border-t border-slate-100 py-16">
+          <div className="max-w-5xl mx-auto px-8">
+            <h2 className="text-2xl font-bold text-slate-900 text-center mb-10">Für welchen Anwendungsfall?</h2>
+            <div className="grid md:grid-cols-3 gap-5">
+              {[
+                {
+                  emoji: '🏠', title: 'Self-Service',
+                  desc: 'Du verwaltest selbst — Authaver übernimmt alle Routineaufgaben. Posteingang, Rechnungen und Mahnwesen laufen automatisch.',
+                  tags: ['Kleiner Bestand', 'Familienbesitz', 'WEG-ähnlich'],
+                  cta: 'Self-Service Demo',
+                },
+                {
+                  emoji: '🔍', title: 'Control Layer',
+                  desc: 'Du hast eine externe Verwaltung — Authaver gibt dir volle Transparenz. Sieh was läuft, ohne täglich nachzufragen.',
+                  tags: ['Externe Verwaltung', 'Kontrollschicht', 'Überwachung'],
+                  cta: 'Control-Layer Demo',
+                },
+                {
+                  emoji: '🤝', title: 'Managed Setup',
+                  desc: 'Ein Dienstleister richtet Authaver für dich ein, hostet und wartet die Plattform. Du siehst nur was wirklich zählt.',
+                  tags: ['Full-Service', 'Kein IT-Aufwand', 'Support inklusive'],
+                  cta: 'Mehr erfahren',
+                },
+              ].map(m => (
+                <Card key={m.title} className="p-6">
+                  <div className="text-3xl mb-4">{m.emoji}</div>
+                  <div className="text-base font-semibold text-slate-900 mb-2">{m.title}</div>
+                  <p className="text-sm text-slate-500 mb-4 leading-relaxed">{m.desc}</p>
+                  <div className="flex flex-wrap gap-1.5 mb-5">
+                    {m.tags.map(t => <Badge key={t} color="slate">{t}</Badge>)}
+                  </div>
+                  <Btn variant="secondary" sm onClick={() => go('dashboard')}>{m.cta} →</Btn>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Feature highlights */}
+        <div className="max-w-5xl mx-auto px-8 py-16">
+          <h2 className="text-2xl font-bold text-slate-900 text-center mb-10">Was Authaver anders macht</h2>
+          <div className="grid md:grid-cols-2 gap-5">
+            {[
+              { icon: '◉', title: 'KI-Agenten-Architektur', desc: 'Fünf spezialisierte Agenten arbeiten im Hintergrund. Inspiriert von Paperclip — jeder Agent hat Rolle, Budget und Heartbeat.' },
+              { icon: '✉', title: 'Intelligenter Posteingang', desc: 'E-Mails werden automatisch klassifiziert: Rechnung, Ticket, Anfrage, Beleg — mit Konfidenzangabe und direktem Handlungsvorschlag.' },
+              { icon: '◎', title: 'Smarte Rechnungsprüfung', desc: 'Jede Rechnung wird mit offenen Tickets abgeglichen. Abweichungen werden erklärt, Vergleichswerte gezeigt, Buchungen vorgeschlagen.' },
+              { icon: '▦', title: 'Selbst hostbar & DSGVO', desc: 'Alle Daten auf deinem Server. Kein Cloud-Zwang, kein Vendor-Lock-in. Deployment in einer Zeile via Docker Compose.' },
+            ].map(f => (
+              <Card key={f.title} className="p-5 flex items-start gap-4">
+                <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center text-lg flex-shrink-0">{f.icon}</div>
+                <div>
+                  <div className="text-sm font-semibold text-slate-900 mb-1">{f.title}</div>
+                  <p className="text-sm text-slate-500 leading-relaxed">{f.desc}</p>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <div className="text-center mt-12">
+            <Btn onClick={() => go('dashboard')}>Jetzt Demo ausprobieren →</Btn>
+            <p className="text-xs text-slate-400 mt-3">Open Source · MIT Lizenz · github.com/reyk-zepper/authaver</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function Dashboard({ go }) {
+    return (
+      <Shell current="dashboard" go={go}>
+        <TopBar
+          title="Dashboard"
+          subtitle="In unter 2 Minuten wissen, was heute zählt."
+          actions={
+            <>
+              <Btn variant="secondary" sm onClick={() => go('agenten')}>Agenten ansehen</Btn>
+              <Btn sm onClick={() => go('posteingang')}>Posteingang öffnen</Btn>
+            </>
+          }
+        />
+        <Page wide>
+          {/* Stats */}
+          <div className="grid grid-cols-4 gap-4 mb-6">
+            {[
+              { label: 'Einheiten', value: `${PROPERTY.occupied} / ${PROPERTY.units}`, sub: `${PROPERTY.vacant} Leerstand`, color: 'text-slate-900' },
+              { label: 'Monatsmiete (Soll)', value: `${PROPERTY.monthlyRent.toLocaleString('de-DE')} €`, sub: 'Erwarteter Eingang', color: 'text-slate-900' },
+              { label: 'Neue Nachrichten', value: '5', sub: 'Heute klassifiziert', color: 'text-indigo-600' },
+              { label: 'Offene Vorgänge', value: '4', sub: '1 dringend · 2 mittel', color: 'text-red-600' },
+            ].map(s => (
+              <Card key={s.label} className="p-5">
+                <div className="text-xs text-slate-400 mb-1.5 font-medium">{s.label}</div>
+                <div className={`text-2xl font-bold ${s.color}`}>{s.value}</div>
+                <div className="text-xs text-slate-400 mt-1">{s.sub}</div>
+              </Card>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-3 gap-6">
+            {/* Priority list */}
+            <div className="col-span-2">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-sm font-semibold text-slate-900">KI-Prioritätsliste</h2>
+                <span className="text-xs text-slate-400">Paula · vor 4 Min. aktualisiert</span>
+              </div>
+              <div className="space-y-2.5">
+                {PRIORITIES.map(p => {
+                  const u = urgencyStyle[p.urgency];
+                  return (
+                    <button
+                      key={p.id}
+                      onClick={() => go(p.screen)}
+                      className={`w-full text-left p-4 rounded-2xl border ${u.bg} ${u.border} hover:shadow-sm transition-all group`}
+                    >
+                      <div className="flex items-start gap-3">
+                        <span className={`mt-1.5 w-2 h-2 rounded-full flex-shrink-0 ${u.dot} ${u.pulse ? 'pulse-dot' : ''}`} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                            <span className="text-sm font-medium text-slate-900">{p.title}</span>
+                            <Badge color={p.urgency === 'high' ? 'red' : p.urgency === 'medium' ? 'amber' : 'blue'}>
+                              {p.kind}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-slate-500">{p.subtitle}</div>
+                        </div>
+                        <span className="text-slate-300 group-hover:text-slate-500 transition-all">›</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {/* Right column */}
+            <div className="space-y-4">
+              <KIBox
+                title="Heutige Zusammenfassung"
+                confidence="hoch"
+                points={[
+                  'Wasserschaden WE 8: Gutachtertermin noch offen',
+                  'Rechnung Köstler: kein Ticket-Match — prüfen',
+                  'Fischer WE 5: 3. Mietrückstand in Folge',
+                ]}
+                actions={[
+                  { label: 'Alle prüfen', onClick: () => go('posteingang') },
+                ]}
+              />
+
+              <Card className="p-5">
+                <div className="text-xs font-semibold text-slate-900 mb-3">Monatsbilanz</div>
+                <div className="space-y-2.5">
+                  {[
+                    { label: 'Mieteingang', value: '13.550 €', ok: false, note: '1.250 € offen' },
+                    { label: 'Rechnungen bezahlt', value: '3.240 €', ok: true },
+                    { label: 'Offene Forderungen', value: '1.250 €', ok: false },
+                    { label: 'Neue Tickets', value: '3', ok: true },
+                    { label: 'Archivierte Dokumente', value: '12', ok: true },
+                  ].map(r => (
+                    <div key={r.label} className="flex justify-between items-start text-sm">
+                      <div>
+                        <span className="text-slate-500">{r.label}</span>
+                        {r.note && <div className="text-xs text-red-500">{r.note}</div>}
+                      </div>
+                      <span className={`font-medium ${r.ok ? 'text-slate-800' : 'text-red-600'}`}>{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card className="p-4 bg-indigo-50 border-indigo-200">
+                <div className="text-xs font-semibold text-indigo-700 mb-1">Nächste Fälligkeiten</div>
+                <div className="space-y-1.5 text-xs text-indigo-800">
+                  <div className="flex justify-between"><span>Rechnung Köstler</span><span>30.04.2025</span></div>
+                  <div className="flex justify-between"><span>Miete WE 5 (Fischer)</span><span>Überfällig</span></div>
+                  <div className="flex justify-between"><span>Versicherungsprämie</span><span>15.05.2025</span></div>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </Page>
+      </Shell>
+    );
+  }
+
+  function Agenten({ go }) {
+    const [paused, setPaused] = useState({});
+    const toggle = id => setPaused(p => ({ ...p, [id]: !p[id] }));
+
+    return (
+      <Shell current="agenten" go={go}>
+        <TopBar
+          title="KI-Agenten"
+          subtitle="5 spezialisierte Agenten arbeiten automatisch im Hintergrund — nach Paperclip-Agentenarchitektur."
+          badge={{ color: 'purple', label: 'Paperclip-Pattern' }}
+          actions={
+            <>
+              <Btn variant="secondary" sm>Neuen Agenten</Btn>
+              <Btn sm>Protokoll ansehen</Btn>
+            </>
+          }
+        />
+        <Page wide>
+          {/* Architecture note */}
+          <div className="mb-6 p-4 bg-indigo-50 border border-indigo-200 rounded-2xl flex items-start gap-3">
+            <span className="text-indigo-500 text-lg flex-shrink-0 mt-0.5">◉</span>
+            <div className="text-sm text-indigo-800 leading-relaxed">
+              <strong>Paperclip-Agentenarchitektur:</strong> Jeder Agent hat eine definierte Rolle, ein monatliches Token-Budget, einen Heartbeat-Takt und ein immutables Aktivitätsprotokoll.
+              Paula ist die Orchestratorin und koordiniert alle Spezialagenten. Du als Eigentümer hast jederzeit vollständige Kontrolle — pausieren, übersteuern, Budget anpassen.
+              <a className="ml-2 underline opacity-60" href="https://paperclip.ing" target="_blank">paperclip.ing ↗</a>
+            </div>
+          </div>
+
+          {/* Agents grid */}
+          <div className="grid grid-cols-2 gap-5 mb-6">
+            {AGENTS.map(agent => {
+              const isPaused = paused[agent.id];
+              const effectiveStatus = isPaused ? 'idle' : agent.status;
+              const s = agentStatusCfg[effectiveStatus];
+              const budgetColor = agent.budget > 70 ? 'bg-red-500' : agent.budget > 40 ? 'bg-amber-400' : 'bg-emerald-500';
+
+              return (
+                <Card key={agent.id} className={`p-6 transition-all ${agent.status === 'alert' && !isPaused ? 'ring-2 ring-red-300' : ''}`}>
+                  <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-700 font-bold text-lg flex-shrink-0">
+                        {agent.name[0]}
+                      </div>
+                      <div>
+                        <div className="font-semibold text-slate-900">{agent.name}</div>
+                        <div className="text-xs text-slate-400">{agent.role}</div>
+                      </div>
+                    </div>
+                    <StatusDot status={effectiveStatus} />
+                  </div>
+
+                  <p className="text-sm text-slate-600 mb-4 leading-relaxed">{agent.desc}</p>
+
+                  {/* Budget bar */}
+                  <div className="mb-3">
+                    <div className="flex justify-between text-xs text-slate-500 mb-1.5">
+                      <span>Monatsbudget</span>
+                      <span className="font-medium">{agent.budget}% genutzt</span>
+                    </div>
+                    <div className="h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full transition-all ${budgetColor}`} style={{ width: `${agent.budget}%` }} />
+                    </div>
+                  </div>
+
+                  {/* Heartbeat & last action */}
+                  <div className="space-y-1.5 mb-4">
+                    <div className="flex items-center gap-2 text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">
+                      <span className="text-slate-300">◷</span>
+                      <span><strong>Heartbeat:</strong> {agent.heartbeat}</span>
+                    </div>
+                    <div className="text-xs text-slate-500 bg-slate-50 rounded-xl px-3 py-2">
+                      <span className="text-slate-300 mr-1">›</span>
+                      <strong>Letzte Aktion:</strong> {agent.lastAction}
+                    </div>
+                    <div className="text-xs text-slate-400 px-3">
+                      {agent.processed} {agent.unit} verarbeitet (Monat)
+                    </div>
+                  </div>
+
+                  <div className="flex gap-2 pt-3 border-t border-slate-100">
+                    <Btn variant="ghost" sm>Protokoll</Btn>
+                    <Btn variant="ghost" sm>Konfigurieren</Btn>
+                    <Btn variant="secondary" sm onClick={() => toggle(agent.id)}>
+                      {isPaused ? '▶ Aktivieren' : '⏸ Pausieren'}
+                    </Btn>
+                  </div>
+                </Card>
+              );
+            })}
+          </div>
+
+          {/* Org chart */}
+          <Card className="p-6">
+            <div className="text-sm font-semibold text-slate-900 mb-4">Orchestrierungs-Hierarchie</div>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="flex items-center gap-2 bg-indigo-50 border border-indigo-200 rounded-xl px-4 py-2.5 text-sm">
+                <span className="text-indigo-600 font-semibold">Du</span>
+                <span className="text-indigo-400 text-xs">(Board-Ebene · vollständige Kontrolle)</span>
+              </div>
+              <span className="text-slate-400 text-lg">→</span>
+              <div className="flex items-center gap-2 bg-purple-50 border border-purple-200 rounded-xl px-4 py-2.5 text-sm">
+                <span className="font-semibold text-purple-700">Paula</span>
+                <span className="text-purple-400 text-xs">(Orchestratorin)</span>
+              </div>
+              <span className="text-slate-400 text-lg">→</span>
+              <div className="flex gap-2 flex-wrap">
+                {['Rex', 'Max', 'Diana', 'Zara'].map(n => (
+                  <div key={n} className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-700">{n}</div>
+                ))}
+              </div>
+            </div>
+            <p className="text-xs text-slate-400 mt-3">
+              Paula koordiniert alle Spezialagenten. Eskalationen, Alarme und Freigabeanfragen kommen direkt zu dir.
+              Jede Aktion ist im immutablen Protokoll nachvollziehbar.
+            </p>
+          </Card>
+        </Page>
+      </Shell>
+    );
+  }
+
+  function Posteingang({ go }) {
+    const [selected, setSelected] = useState(null);
+    const email = selected ? EMAILS.find(e => e.id === selected) : null;
+
+    return (
+      <Shell current="posteingang" go={go}>
+        <TopBar
+          title="Posteingang"
+          subtitle="Paula hat 5 E-Mails klassifiziert, priorisiert und Handlungsvorschläge vorbereitet."
+          actions={
+            <>
+              <Btn variant="secondary" sm>Alle gelesen</Btn>
+              <Btn sm>Neue E-Mail</Btn>
+            </>
+          }
+        />
+        <div className="flex" style={{ height: 'calc(100vh - 73px)' }}>
+          {/* Email list */}
+          <div className="w-96 border-r border-slate-200 overflow-y-auto flex-shrink-0 bg-white">
+            {EMAILS.map(e => (
+              <button
+                key={e.id}
+                onClick={() => setSelected(e.id === selected ? null : e.id)}
+                className={`w-full text-left px-4 py-4 border-b border-slate-100 transition-all hover:bg-slate-50 ${selected === e.id ? 'bg-indigo-50 border-l-2 border-l-indigo-500' : ''}`}
+              >
+                <div className="flex items-start justify-between gap-2 mb-1">
+                  <span className={`text-sm font-medium truncate ${e.urgent ? 'text-slate-900' : 'text-slate-700'}`}>{e.from}</span>
+                  <span className="text-xs text-slate-400 flex-shrink-0">{e.time}</span>
+                </div>
+                <div className="text-xs text-slate-500 truncate mb-2">{e.subject}</div>
+                <Badge color={e.badgeColor}>{e.badge}</Badge>
+              </button>
+            ))}
+          </div>
+
+          {/* Detail pane */}
+          {email ? (
+            <div className="flex-1 overflow-y-auto px-8 py-6">
+              <div className="max-w-2xl">
+                <div className="flex items-center gap-2 mb-3">
+                  <Badge color={email.badgeColor}>{email.badge}</Badge>
+                </div>
+                <h2 className="text-xl font-semibold text-slate-900 mb-1">{email.subject}</h2>
+                <div className="text-sm text-slate-400 mb-6">
+                  Von: <span className="text-slate-700">{email.from}</span> &lt;{email.email}&gt; · {email.time}
+                </div>
+
+                <Card className="p-4 mb-4 bg-indigo-50 border-indigo-200">
+                  <div className="flex items-start gap-2">
+                    <span className="text-indigo-500 flex-shrink-0 mt-0.5">◉</span>
+                    <div>
+                      <div className="text-xs font-semibold text-indigo-700 mb-0.5">Paula · KI-Analyse</div>
+                      <div className="text-sm text-indigo-800">{email.aiNote}</div>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="p-5 mb-6">
+                  <p className="text-sm text-slate-700 leading-relaxed">{email.preview}</p>
+                  <p className="text-sm text-slate-300 mt-4 italic">[Vollständiger E-Mail-Text in der Produktversion sichtbar]</p>
+                </Card>
+
+                <div className="flex gap-2 flex-wrap">
+                  <Btn>Antworten (Entwurf)</Btn>
+                  <Btn variant="secondary">Ticket anlegen</Btn>
+                  <Btn variant="secondary">Als Beleg archivieren</Btn>
+                  <Btn variant="ghost">Ignorieren</Btn>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="flex-1 flex items-center justify-center bg-slate-50">
+              <div className="text-center text-slate-400">
+                <div className="text-5xl mb-4 opacity-30">✉</div>
+                <div className="text-sm">E-Mail aus der Liste auswählen</div>
+                <div className="text-xs mt-1 opacity-60">5 Nachrichten von Paula klassifiziert</div>
+              </div>
+            </div>
+          )}
+        </div>
+      </Shell>
+    );
+  }
+
+  function Ticket({ go }) {
+    const [status, setStatus] = useState('In Bearbeitung');
+    const [reply, setReply] = useState('');
+
+    return (
+      <Shell current="ticket" go={go}>
+        <TopBar
+          title="Ticket #24-087 · Wasserschaden WE 8"
+          badge={{ color: 'red', label: 'Dringend · 3 Tage offen' }}
+          subtitle="Bergstraße 14 · Familie Hoffmann · Rohrbruch Bad"
+          actions={
+            <>
+              <select
+                value={status}
+                onChange={e => setStatus(e.target.value)}
+                className="text-sm border border-slate-300 rounded-xl px-3 py-2 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              >
+                {['Neu', 'In Bearbeitung', 'Warte auf Antwort', 'Warte auf Gutachter', 'Erledigt'].map(s => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+              <Btn sm>Als erledigt schließen</Btn>
+            </>
+          }
+        />
+        <Page wide>
+          <div className="grid grid-cols-3 gap-6">
+            {/* Timeline */}
+            <div className="col-span-2 space-y-4">
+              <Card className="p-5">
+                <div className="text-sm font-semibold text-slate-900 mb-5">Verlauf</div>
+                <div className="space-y-5">
+                  {[
+                    {
+                      time: 'Heute, 08:34', actor: 'Paula', ai: true,
+                      text: 'Versicherungsbestätigung von Allianz eingegangen. Schadensnummer 2025-M-44521 automatisch mit diesem Ticket verknüpft. Gutachtertermin wird in 48 h erwartet.',
+                    },
+                    {
+                      time: 'Gestern, 15:11', actor: 'Du', ai: false,
+                      text: 'Versicherung per E-Mail informiert. Gutachtertermin angefragt. Mieter über nächste Schritte informiert.',
+                    },
+                    {
+                      time: 'Gestern, 09:00', actor: 'Paula', ai: true,
+                      text: 'Ticket aus E-Mail von Familie Hoffmann automatisch erstellt. Kategorie: Wasserschaden. Priorität: Hoch. Versicherung als nächster Schritt vorgeschlagen.',
+                    },
+                    {
+                      time: 'Di., 18:45', actor: 'Familie Hoffmann', ai: false,
+                      text: 'Rohrbruch im Bad. Wasser läuft unter Fliesen. Schimmelgefahr. 3 Fotos angehängt (Wasserfleck, Rohrbruchstelle, Bodenbelag).',
+                    },
+                  ].map((e, i, arr) => (
+                    <div key={i} className="flex gap-4">
+                      <div className="flex flex-col items-center flex-shrink-0">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${e.ai ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-600'}`}>
+                          {e.ai ? 'KI' : e.actor === 'Du' ? 'Du' : 'M'}
+                        </div>
+                        {i < arr.length - 1 && <div className="w-px flex-1 bg-slate-200 mt-2" />}
+                      </div>
+                      <div className="pb-4 flex-1">
+                        <div className="flex items-center gap-2 mb-1.5">
+                          <span className="text-sm font-medium text-slate-900">{e.actor}</span>
+                          {e.ai && <Badge color="indigo">KI-Aktion</Badge>}
+                          <span className="text-xs text-slate-400">{e.time}</span>
+                        </div>
+                        <p className="text-sm text-slate-700 leading-relaxed">{e.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card className="p-5">
+                <div className="text-sm font-semibold text-slate-900 mb-3">Antwort / Notiz verfassen</div>
+                <textarea
+                  value={reply}
+                  onChange={e => setReply(e.target.value)}
+                  placeholder="Antwort an Mieter, Notiz für sich oder Aufgabe für Handwerker..."
+                  className="w-full text-sm border border-slate-200 rounded-xl px-4 py-3 resize-none h-24 focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-transparent"
+                />
+                <div className="flex gap-2 mt-3">
+                  <Btn sm>Senden</Btn>
+                  <Btn variant="secondary" sm>Entwurf</Btn>
+                  <Btn variant="ghost" sm>Handwerker beauftragen</Btn>
+                </div>
+              </Card>
+            </div>
+
+            {/* Sidebar */}
+            <div className="space-y-4">
+              <KIBox
+                title="Empfohlene nächste Schritte"
+                confidence="hoch"
+                points={[
+                  'Gutachtertermin mit Allianz bestätigen',
+                  'Sanitärbetrieb für Kostenvoranschlag anfragen',
+                  'Mieter über Zeitplan schriftlich informieren',
+                  'Erinnerung in 48 h setzen falls kein Termin',
+                ]}
+                actions={[
+                  { label: 'Entwürfe erstellen', onClick: () => {} },
+                  { label: 'Erinnerung setzen', onClick: () => {} },
+                ]}
+              />
+
+              <Card className="p-4">
+                <div className="text-xs font-semibold text-slate-900 mb-3">Ticket-Details</div>
+                <div className="space-y-2.5 text-xs">
+                  {[
+                    ['Einheit', 'WE 8 · Familie Hoffmann'],
+                    ['Kategorie', 'Schaden · Wasserschaden'],
+                    ['Versicherung', 'Allianz · 2025-M-44521'],
+                    ['Priorität', '🔴 Hoch'],
+                    ['Status', status],
+                    ['Erstellt', 'Di., 18:45 Uhr'],
+                    ['Letzte Aktion', 'Heute, 08:34 Uhr'],
+                  ].map(([k, v]) => (
+                    <div key={k} className="flex justify-between items-start gap-2">
+                      <span className="text-slate-400 flex-shrink-0">{k}</span>
+                      <span className="text-slate-700 font-medium text-right">{v}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              <Card className="p-4">
+                <div className="text-xs font-semibold text-slate-900 mb-2">Anhänge (3)</div>
+                {['Foto_Wasserfleck.jpg', 'Foto_Rohrbruch.jpg', 'Foto_Boden.jpg'].map(f => (
+                  <div key={f} className="flex items-center gap-2 py-1.5 text-xs text-slate-600">
+                    <span className="text-slate-300">▦</span>{f}
+                  </div>
+                ))}
+              </Card>
+            </div>
+          </div>
+        </Page>
+      </Shell>
+    );
+  }
+
+  function Rechnung({ go }) {
+    const [decision, setDecision] = useState(null);
+
+    return (
+      <Shell current="rechnung" go={go}>
+        <TopBar
+          title="Rechnung #2025-089 · Köstler Handwerk GmbH"
+          badge={{ color: 'amber', label: 'Rex: Prüfung empfohlen' }}
+          subtitle="Eingegangen: Heute, 08:34 · Betrag: 2.340,00 € brutto · Fälligkeit: 30.04.2025"
+        />
+        <Page wide>
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-2 space-y-4">
+              <Card className="p-6">
+                <div className="text-sm font-semibold text-slate-900 mb-5">Rechnungsdetails</div>
+                <div className="grid grid-cols-2 gap-x-8 gap-y-4 text-sm">
+                  {[
+                    ['Aussteller', 'Köstler Handwerk GmbH'],
+                    ['Rechnungsnummer', '#2025-089'],
+                    ['Rechnungsdatum', '01.04.2025'],
+                    ['Fälligkeit', '30.04.2025'],
+                    ['Betrag netto', '1.966,39 €'],
+                    ['MwSt. 19%', '373,61 €'],
+                    ['Betrag brutto', '2.340,00 €'],
+                    ['Kategorie', 'Sanitär · Instandhaltung'],
+                    ['Zahlungsziel', '30 Tage netto'],
+                    ['IBAN Empfänger', 'DE89 3704 0044 0532 0130 00'],
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <div className="text-xs text-slate-400 mb-0.5">{k}</div>
+                      <div className="text-slate-800 font-medium">{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {decision && (
+                <Card className={`p-4 ${decision === 'approve' ? 'bg-emerald-50 border-emerald-200' : 'bg-red-50 border-red-200'}`}>
+                  <div className={`text-sm font-medium ${decision === 'approve' ? 'text-emerald-700' : 'text-red-700'}`}>
+                    {decision === 'approve'
+                      ? '✓ Rechnung freigegeben. SEPA-Überweisung an Köstler Handwerk GmbH wird vorbereitet. Buchung unter Instandhaltung.'
+                      : '✗ Rechnung abgelehnt. Rückfrage-E-Mail an Köstler Handwerk GmbH wird vorbereitet.'}
+                  </div>
+                </Card>
+              )}
+
+              {!decision && (
+                <div className="flex gap-3 flex-wrap">
+                  <Btn variant="success" onClick={() => setDecision('approve')}>✓ Freigeben &amp; überweisen</Btn>
+                  <Btn variant="secondary">Rückfrage senden</Btn>
+                  <Btn variant="secondary">Leistungsnachweis anfordern</Btn>
+                  <Btn variant="danger" onClick={() => setDecision('reject')}>✗ Ablehnen</Btn>
+                </div>
+              )}
+            </div>
+
+            <div className="space-y-4">
+              <KIBox
+                title="Rex – Rechnungsanalyse"
+                confidence="mittel"
+                points={[
+                  'Kein offenes Ticket für Sanitärarbeiten im März',
+                  'Betrag 18 % über Durchschnittswert (Ø 1.980 €)',
+                  'Köstler Handwerk: bekannter Dienstleister (12 frühere Rechnungen)',
+                  'Leistungsdatum: 28.03. — Ticket erst am 02.04. erstellt?',
+                ]}
+                actions={[
+                  { label: 'Nachweis anfordern', onClick: () => {} },
+                  { label: 'Trotzdem freigeben', onClick: () => setDecision('approve') },
+                ]}
+              />
+
+              <Card className="p-4">
+                <div className="text-xs font-semibold text-slate-900 mb-3">Vergleichsrechnungen</div>
+                <div className="space-y-2">
+                  {[
+                    { date: 'Feb 2025', desc: 'Köstler · Sanitär', amount: '1.890 €', ok: true },
+                    { date: 'Nov 2024', desc: 'Köstler · Sanitär', amount: '2.100 €', ok: true },
+                    { date: 'Aug 2024', desc: 'Köstler · Sanitär', amount: '1.750 €', ok: true },
+                    { date: 'Mrz 2024', desc: 'Andere · Sanitär', amount: '1.650 €', ok: true },
+                  ].map(r => (
+                    <div key={r.date} className="flex justify-between items-center py-2 border-b border-slate-100 last:border-0 text-xs">
+                      <div>
+                        <div className="font-medium text-slate-700">{r.date}</div>
+                        <div className="text-slate-400">{r.desc}</div>
+                      </div>
+                      <span className="text-slate-700 font-medium">{r.amount}</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-3 pt-3 border-t border-slate-100 text-xs flex justify-between">
+                  <span className="text-slate-400">Durchschnitt</span>
+                  <span className="font-semibold text-slate-700">1.848 €</span>
+                </div>
+              </Card>
+            </div>
+          </div>
+        </Page>
+      </Shell>
+    );
+  }
+
+  function Archiv({ go }) {
+    return (
+      <Shell current="archiv" go={go}>
+        <TopBar
+          title="Archiv & Nebenkostenabrechnung 2024"
+          subtitle="Bergstraße 14 · 4 von 6 Belegen vollständig · Abrechnung noch nicht finalisierbar"
+          badge={{ color: 'amber', label: '2 Belege fehlen' }}
+          actions={
+            <>
+              <Btn variant="secondary" sm>Beleg hochladen</Btn>
+              <Btn sm disabled>Abrechnung erstellen</Btn>
+            </>
+          }
+        />
+        <Page wide>
+          <div className="grid grid-cols-3 gap-6">
+            <div className="col-span-2 space-y-4">
+              <Card className="p-5">
+                <div className="text-sm font-semibold text-slate-900 mb-4">Nebenkostenbelege 2024</div>
+                <div className="space-y-2">
+                  {[
+                    { name: 'Heizkostenabrechnung 2024',    status: 'ok',      size: '1,2 MB', date: '15.01.2025', source: 'Diana archiviert' },
+                    { name: 'Wasserabrechnung 2024',         status: 'ok',      size: '0,8 MB', date: '20.01.2025', source: 'Diana archiviert' },
+                    { name: 'Gebäudeversicherung 2024',      status: 'ok',      size: '2,1 MB', date: '03.02.2025', source: 'Manuell hochgeladen' },
+                    { name: 'Hausmeisterkosten 2024',        status: 'ok',      size: '0,5 MB', date: '14.02.2025', source: 'Diana archiviert' },
+                    { name: 'Wartung Kellerbeleuchtung',     status: 'missing', size: '—',     date: '—',          source: 'Diana: Beleg angefordert' },
+                    { name: 'Treppenreinigung Dezember',     status: 'missing', size: '—',     date: '—',          source: 'Diana: Beleg ausstehend' },
+                  ].map(item => (
+                    <div key={item.name} className={`flex items-center gap-3 p-3 rounded-xl text-sm ${item.status === 'missing' ? 'bg-amber-50 border border-amber-200' : 'bg-slate-50'}`}>
+                      <span className={`text-lg flex-shrink-0 ${item.status === 'ok' ? 'text-emerald-500' : 'text-amber-400'}`}>
+                        {item.status === 'ok' ? '✓' : '○'}
+                      </span>
+                      <div className="flex-1 min-w-0">
+                        <div className={`font-medium truncate ${item.status === 'missing' ? 'text-amber-800' : 'text-slate-700'}`}>{item.name}</div>
+                        <div className="text-xs text-slate-400">{item.source}</div>
+                      </div>
+                      <div className="text-xs text-slate-400 text-right flex-shrink-0">
+                        <div>{item.size}</div>
+                        <div>{item.date}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+
+              {/* Summary card */}
+              <Card className="p-5">
+                <div className="text-sm font-semibold text-slate-900 mb-4">Nebenkostenübersicht 2024</div>
+                <div className="grid grid-cols-2 gap-4 text-sm">
+                  {[
+                    ['Heizkosten', '27.840 €'],
+                    ['Wasserversorgung', '8.920 €'],
+                    ['Versicherungen', '4.200 €'],
+                    ['Hausmeister', '6.000 €'],
+                    ['Fehlende Positionen', '— €'],
+                    ['Gesamt (vorläufig)', '46.960 €'],
+                  ].map(([k, v]) => (
+                    <div key={k}>
+                      <div className="text-xs text-slate-400 mb-0.5">{k}</div>
+                      <div className="font-medium text-slate-800">{v}</div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+
+            <div className="space-y-4">
+              <KIBox
+                title="Diana – NK-Vorbereitung"
+                confidence="mittel"
+                points={[
+                  '4 von 6 Belegen vollständig',
+                  'Wartungsbeleg: Dienstleister kontaktiert',
+                  'Treppenreinigung: Quittung fehlt',
+                  'NK-Abrechnung noch nicht finalisierbar',
+                ]}
+                actions={[
+                  { label: 'Belege anfordern', onClick: () => {} },
+                  { label: 'Ohne Belege fortfahren', onClick: () => {} },
+                ]}
+              />
+
+              <Card className="p-4">
+                <div className="text-xs font-semibold text-slate-900 mb-3">NK-Zeitplan</div>
+                <div className="space-y-2 text-xs">
+                  {[
+                    { label: 'Abrechnungszeitraum', value: '01.01.–31.12.2024', ok: true },
+                    { label: 'Versanddeadline', value: '31.12.2025', ok: true },
+                    { label: 'Belege vollständig', value: 'Noch ausstehend', ok: false },
+                    { label: 'Mieteranzahl', value: '10 Mietparteien', ok: true },
+                  ].map(r => (
+                    <div key={r.label} className="flex justify-between items-center py-1.5 border-b border-slate-100 last:border-0">
+                      <span className="text-slate-400">{r.label}</span>
+                      <span className={`font-medium ${r.ok ? 'text-slate-700' : 'text-amber-600'}`}>{r.value}</span>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            </div>
+          </div>
+        </Page>
+      </Shell>
+    );
+  }
+
+  // ── APP ───────────────────────────────────────────────────────────────
+
+  function App() {
+    const [screen, setScreen] = useState('landing');
+
+    const screens = {
+      landing:     <Landing go={setScreen} />,
+      dashboard:   <Dashboard go={setScreen} />,
+      agenten:     <Agenten go={setScreen} />,
+      posteingang: <Posteingang go={setScreen} />,
+      ticket:      <Ticket go={setScreen} />,
+      rechnung:    <Rechnung go={setScreen} />,
+      archiv:      <Archiv go={setScreen} />,
+    };
+
+    return screens[screen] || screens.landing;
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
