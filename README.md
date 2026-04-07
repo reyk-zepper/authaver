@@ -2,55 +2,75 @@
 
 > **Self-hosted. AI-powered. Zero monthly fees.**
 >
-> Authaver is an open-source property management platform with a team of AI agents working in the background. They process your inbox, verify invoices, monitor rent payments, and archive documents — automatically. You only decide on exceptions.
+> Authaver is an open-source property management platform for private landlords, small portfolio holders, and homeowner associations (WEG). A team of AI agents works in the background — processing your inbox, verifying invoices, monitoring rent, archiving documents, and managing dunning. You only decide on exceptions.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Status: Early Alpha](https://img.shields.io/badge/Status-Early%20Alpha-orange.svg)]()
 [![Stack: Next.js + TypeScript](https://img.shields.io/badge/Stack-Next.js%20%2B%20TypeScript-black.svg)]()
 [![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)]()
 
-[🇩🇪 Deutsche Version](README.de.md) · [Live Demo](mockup.html) · [Architecture Docs](docs/architecture/)
+[🇩🇪 Deutsche Version](README.de.md) · [Live Demo](mockup-v2.html) · [Architecture Docs](docs/architecture/)
 
 ---
 
 ## What is Authaver?
 
-Managing rental properties is full of repetitive, time-consuming work: sorting mail, checking invoices, chasing rent, preparing utility billing. Most landlords either spend hours every week on administration or pay professional property managers €30–50 per unit per month.
+Managing rental properties and homeowner associations is full of repetitive, time-consuming work: sorting mail, checking invoices, chasing rent, filing documents, preparing utility billing, coordinating repairs. Most landlords either spend hours every week on administration or pay professional property managers €30–50 per unit per month.
 
 Authaver takes a different approach: **a team of specialized AI agents handles the routine, you stay in control of decisions.**
 
-The system is inspired by the [Paperclip agent architecture](https://paperclip.ing) — each agent has a defined role, a monthly token budget, a heartbeat schedule, and writes every action to an immutable audit log. You're the board. You can pause, override, or adjust any agent at any time.
+Every transaction, document, and communication is tied to a shared operational core — property, unit, cost category, period, process, approval, document. This keeps utility billing, HOA finances, reserves, repairs, and measures cleanly traceable and auditable at all times.
 
 ---
 
-## Core Features
+## Who is Authaver for?
 
-### Dashboard
-Know what needs attention in under 2 minutes. The AI prepares a prioritized list every morning — urgent issues at the top, low-priority items at the bottom.
+Authaver is designed to scale from 10 to 1,000 units, serving multiple user types:
 
-### AI Inbox (Paula)
-Every incoming email is automatically classified: invoice, repair request, rent query, legal notice, confirmation. Paula routes it to the right place and prepares a suggested response.
+| Persona | Goal |
+|---|---|
+| **Private self-manager** | Manage 1–20 units independently, cut costs, stay in control |
+| **Portfolio holder / family office** | Standardize processes across multiple properties, delegate with oversight |
+| **Control owner** | Monitor an external property manager — transparency and verification layer |
+| **HOA coordinator** | Organize a small homeowner community, manage reserves and resolutions |
+| **Certified internal manager** | Run full WEG administration with auditability |
 
-### Invoice Verification (Rex)
-Every invoice is matched against open tickets. Rex flags mismatches, explains deviations from comparable invoices, and prepares a booking suggestion. You approve or reject in one click.
+Supporting roles (with limited, role-based access): co-owners, accounting staff, technical coordinators, tenants, contractors, external advisors.
 
-### Payment Monitoring (Zara)
-Daily comparison of expected vs. actual rent payments. Zara detects arrears on day 1 and routes to Max for dunning draft preparation.
+---
 
-### Dunning (Max)
-Max monitors payment history and drafts dunning letters according to German legal requirements — graded (1st notice → 2nd notice → legal notice). You review and send.
+## Core Operating Model
 
-### Document Archive (Diana)
-Every incoming document is processed, classified, and filed. Diana tracks which receipts are missing for utility billing and requests them proactively.
+Authaver is built around a **unified transaction and process core**. Every expense, income, and document links to:
 
-### Utility Billing
-Annual Nebenkostenabrechnung preparation: collect all receipts, calculate per-unit allocation, generate drafts per tenant — all with legal German templates.
+- **Property** (Liegenschaft)
+- **Unit or cost center** (Einheit / Kostenstelle)
+- **Cost category** (Kostenart)
+- **Period** (Zeitraum)
+- **Process** (Vorgang)
+- **Approval** (Freigabe)
+- **Document** (Beleg)
+
+This foundation makes utility billing, HOA finances, reserves, repairs, and capital measures cleanly auditable — not just trackable.
+
+### Eight Core Modules
+
+| Module | Function |
+|---|---|
+| **Master Data** | Properties, buildings, units, owners, tenants, contractors, meters |
+| **Process Core** | Tickets, tasks, approvals, deadlines, escalations, audit trail |
+| **Documents** | Contracts, invoices, protocols, certificates, photos — all linked |
+| **Finance** | Receivables, invoices, payments, accounts, reserves, dunning |
+| **Billing** | Utility billing (Nebenkosten), cost categories, allocation keys, drafts |
+| **Repairs** | Damage tickets, contractor assignment, history |
+| **Maintenance** | Recurring obligations, intervals, inspection protocols |
+| **Measures** | Capital projects, resolutions, budgets, milestone billing |
 
 ---
 
 ## AI Agent Architecture
 
-Authaver uses a Paperclip-inspired agent architecture. Five specialized agents work in the background:
+Authaver uses a Paperclip-inspired agent architecture. Specialized agents work in the background, each with a defined role, monthly token budget, heartbeat schedule, and immutable audit log.
 
 ```
 You (Board Level — full control)
@@ -64,10 +84,43 @@ You (Board Level — full control)
 **Key principles:**
 - Each agent has a **monthly token budget** — prevents runaway costs
 - Every action is **logged immutably** — full audit trail for legal compliance
-- **Confidence thresholds**: below threshold → escalate to owner
-- **Human override** always possible — pause, resume, or override any agent
+- **Confidence thresholds**: below threshold → escalate to owner for decision
+- **Human override** always possible — pause, resume, or override any agent at any time
+- **Agent Builder**: create additional specialized agents from templates (e.g. maintenance agent, reporting agent) — role-gated, with approval workflow
 
-See [docs/architecture/paperclip-patterns.md](docs/architecture/paperclip-patterns.md) for the full pattern documentation.
+### How agents surface in the UI
+
+- **KI-Center**: dedicated control room — agent status, token budgets, action history, configuration, agent builder
+- **Contextual**: inline in every screen where an agent was active — Paula's classification in the inbox, Rex's review on an invoice, Max's dunning draft on an overdue payment
+
+---
+
+## Navigation Concept
+
+Authaver uses a **two-layer navigation**:
+
+**Global layer** (always visible):
+```
+Dashboard · Portfolio · Posteingang · Finanzen · KI-Center · Einstellungen
+```
+
+**Property layer** (when a property is open):
+```
+Übersicht · Vorgänge · Mieter · Finanzen · WEG · Dokumente
+```
+
+The **Dashboard** is role-adaptive — every user sees the same "What needs my attention today?" structure, but the content matches their role. A primary owner sees approvals and arrears. Accounting sees open invoices and payment entries. A technical coordinator sees repairs and overdue maintenance.
+
+---
+
+## Process: Mail → Inbox → Action
+
+Every incoming email is processed by Paula:
+
+1. Paula reads and classifies the mail (repair, invoice, inquiry, legal, document)
+2. Paula proposes a typed process with confidence score and plain-language reasoning
+3. The user confirms or corrects — and the process is created
+4. Mail and process stay linked; the KI-Protokoll tab shows every agent action transparently
 
 ---
 
@@ -85,26 +138,60 @@ See [docs/architecture/paperclip-patterns.md](docs/architecture/paperclip-patter
 | Job Queue | BullMQ + Redis | Agent heartbeats and scheduling |
 | Deployment | Docker Compose | Single-command self-hosting |
 
-**AI Provider strategy:** Authaver supports multiple LLM providers through a simple abstraction layer. Use Anthropic Claude or OpenAI for cloud convenience, or run Ollama locally for full data privacy — important for German DSGVO compliance.
+**AI Provider strategy:** Authaver supports multiple LLM providers through a pluggable abstraction layer. Use Anthropic Claude or OpenAI for cloud convenience, or Ollama locally for full data privacy — important for German DSGVO compliance.
 
 ---
 
 ## Self-Hosting
 
-Authaver is designed to run on a standard VPS (Hetzner, Netcup, or any Linux server). Requirements: 2 vCPU, 4 GB RAM, 20 GB storage.
+Authaver runs on a standard VPS (Hetzner, Netcup, or any Linux server). Requirements: 2 vCPU, 4 GB RAM, 20 GB storage.
 
 ```bash
-# Clone and start
 git clone https://github.com/reyk-zepper/authaver
 cd authaver
 cp .env.example .env   # Add your AI provider key
 docker compose up -d
-
-# Open in browser
 open http://localhost:3000
 ```
 
-**Full self-hosting documentation:** Coming with v0.1 release.
+---
+
+## Roadmap
+
+**Phase 0 — Foundation**
+- [ ] Next.js boilerplate (App Router, TypeScript, Tailwind, Docker)
+- [ ] Authentication + role model (5 MVP roles)
+- [ ] Core database schema (unified process/transaction core)
+
+**Phase 1 — Core UI**
+- [ ] Role-adaptive global dashboard
+- [ ] Property setup + property cockpit
+- [ ] Units, tenants, leases
+
+**Phase 2 — Inbox & Processes**
+- [ ] Inbox with Paula classification (3-column UI)
+- [ ] Adaptive process core (all types)
+- [ ] Repair workflow (report → assign → close)
+
+**Phase 3 — Finance Basics**
+- [ ] Invoice intake + Rex verification
+- [ ] Payment monitoring + Zara
+- [ ] Dunning workflow + Max
+
+**Phase 4 — WEG & Billing**
+- [ ] WEG module (Hausgeld, reserves)
+- [ ] Utility billing preparation (Nebenkosten)
+- [ ] Document archive + Diana
+
+**Later**
+- Agent Builder (template + form config)
+- Maintenance module
+- Capital measures / Modernisierung module
+- DATEV export
+- Tenant self-service portal
+- Contractor portal
+- SEPA integration
+- Mobile-responsive UI
 
 ---
 
@@ -120,19 +207,19 @@ open http://localhost:3000
 
 ## Monetization Model
 
-Authaver is MIT-licensed and free to self-host. The software itself costs nothing.
+Authaver is MIT-licensed and free to self-host.
 
-**Professional setup service** (available from us and certified partners):
+**Professional setup service** (from us and certified partners):
 - Server provisioning and Docker deployment
 - Data migration from Excel, CSV, or existing property management software
-- Configuration for your specific German federal state (legal templates, tax settings)
+- Configuration for your German federal state (legal templates, tax settings)
 - DATEV / lexoffice / sevDesk export integration
 - SEPA direct debit configuration
 - Initial property and tenant data setup
 - 2-hour onboarding session
 - Optional: annual support contract
 
-This is the [Red Hat model](https://en.wikipedia.org/wiki/Red_Hat): open software, paid expertise. The moat is knowledge and trust, not code.
+This is the [Red Hat model](https://en.wikipedia.org/wiki/Red_Hat): open software, paid expertise.
 
 ---
 
@@ -142,42 +229,12 @@ Authaver is built for the German market first:
 
 - **DSGVO compliance** built-in (self-hosted = data stays on your server)
 - **Legal document templates** for all 16 German federal states
-- **Nebenkostenabrechnung** according to §556 BGB
+- **Nebenkostenabrechnung** according to §556 BGB and BetrKV
 - **Mietrecht** compliant dunning process (Mahnung → Abmahnung → Kündigung)
+- **WEG-Verwaltung** according to §28 WEG (Wirtschaftsplan, Hausgeld, Jahresabrechnung)
 - **SEPA Lastschrift** support
 - **DATEV export** for accounting integration
-- **Grundsteuer** tracking
-
----
-
-## Roadmap
-
-**v0.1 — MVP (In Progress)**
-- [ ] Property and tenant data management
-- [ ] IMAP email ingestion + Paula classification
-- [ ] Dashboard with AI priority list
-- [ ] Ticket management with timeline
-- [ ] Invoice logging and Rex matching
-- [ ] Basic document archive
-- [ ] Docker Compose deployment
-
-**v0.2 — Core Agents**
-- [ ] Max dunning workflow (graded)
-- [ ] Zara payment monitoring + bank account sync
-- [ ] Diana document gap detection
-- [ ] Full audit log UI
-
-**v0.3 — Utility Billing**
-- [ ] Nebenkostenabrechnung workflow
-- [ ] Tenant-level allocation
-- [ ] PDF generation
-
-**v1.0 — Production Ready**
-- [ ] Multi-property support
-- [ ] DATEV export
-- [ ] SEPA integration
-- [ ] Mobile-responsive UI
-- [ ] Comprehensive test coverage
+- **Heizkostenverordnung** compliant consumption billing
 
 ---
 
@@ -192,21 +249,19 @@ npm install
 npm run dev
 ```
 
-**Good first issues:** [github.com/reyk-zepper/authaver/issues](https://github.com/reyk-zepper/authaver/issues)
-
 Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a PR.
 
 ---
 
 ## License
 
-MIT — use it, fork it, build on it. If you run it as a service for others, you don't have to open-source your changes (MIT, not AGPL). But contributions back are always welcome.
+MIT — use it, fork it, build on it.
 
 ---
 
 ## Why "Authaver"?
 
-*Authaver* = *Authority* + *Haven*. Your property, your authority, your safe haven. The KI handles the noise. You keep control.
+*Authaver* = *Authority* + *Haven*. Your property, your authority, your safe haven. The AI handles the noise. You keep control.
 
 ---
 

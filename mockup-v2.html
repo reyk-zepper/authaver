@@ -1,0 +1,915 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Authaver — Mockup v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; box-sizing: border-box; }
+    html, body, #root { height: 100%; margin: 0; padding: 0; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+  const { useState } = React;
+
+  // ─── DATA ──────────────────────────────────────────────────────────────────
+
+  const PROPERTIES = [
+    { id: 'p1', name: 'Musterstraße 4', city: 'Berlin-Mitte', type: 'Miete', units: 4, occupied: 3, vacant: 1, alerts: 2, rent: 4200 },
+    { id: 'p2', name: 'Bergweg 12', city: 'Berlin-Prenzlauer Berg', type: 'Miete', units: 6, occupied: 6, vacant: 0, alerts: 1, rent: 7800 },
+    { id: 'p3', name: 'Parkstraße 7', city: 'Berlin-Charlottenburg', type: 'WEG', units: 12, occupied: 11, vacant: 1, alerts: 1, hausgeld: 8400 },
+  ];
+
+  const AGENTS = [
+    {
+      id: 'paula', name: 'Paula', role: 'Posteingang & Klassifikation', icon: '📬',
+      status: 'active', heartbeat: 'alle 15 Min', tokenUsed: 18, tokenBudget: 100,
+      lastAction: 'vor 4 Min · 2 Mails klassifiziert',
+      funcs: ['Mail empfangen & einlesen', 'Absender identifizieren', 'Typ erkennen (Reparatur/Rechnung/Anfrage...)', 'Vorgang vorschlagen mit Confidence-Score', 'Bei < 70% Confidence → Nutzer entscheiden lassen', 'Aktion in Audit-Log schreiben'],
+    },
+    {
+      id: 'rex', name: 'Rex', role: 'Rechnungsprüfer', icon: '🔍',
+      status: 'active', heartbeat: 'bei Eingang', tokenUsed: 9, tokenBudget: 100,
+      lastAction: 'gestern · Rechnung #0089 geprüft',
+      funcs: ['Rechnung empfangen & OCR', 'Ticketabgleich prüfen', 'Betrag plausibilisieren', 'Buchungsvorschlag erstellen', 'Abweichungen flaggen', 'Freigabe anfordern'],
+    },
+    {
+      id: 'max', name: 'Max', role: 'Mahnwesen', icon: '⚡',
+      status: 'active', heartbeat: 'täglich 07:00', tokenUsed: 5, tokenBudget: 100,
+      lastAction: 'heute 07:02 · Mahnung Müller vorbereitet',
+      funcs: ['Zahlungsrückstände prüfen', 'Mahnstufe bestimmen', 'Mahnschreiben entwerfen', 'Fristen überwachen', 'Eskalation vorschlagen', 'Aktion loggen'],
+    },
+    {
+      id: 'diana', name: 'Diana', role: 'Dokumenten-Archivarin', icon: '📁',
+      status: 'active', heartbeat: 'bei Eingang', tokenUsed: 12, tokenBudget: 100,
+      lastAction: 'vor 1 Std · Protokoll archiviert',
+      funcs: ['Dokument empfangen & OCR', 'Typ klassifizieren', 'Objekt/Einheit zuordnen', 'Archivieren & verschlagworten', 'Lücken in NK-Belegen erkennen', 'Fehlende Belege anfragen'],
+    },
+    {
+      id: 'zara', name: 'Zara', role: 'Zahlungsmonitor', icon: '💳',
+      status: 'alert', heartbeat: 'täglich 06:00', tokenUsed: 1, tokenBudget: 100,
+      lastAction: 'heute 06:00 · ALARM: Miete Müller fehlt',
+      funcs: ['Kontoauszüge einlesen', 'Soll/Ist abgleichen', 'Rückstände erkennen', 'Zahlungen zuordnen', 'Rücklastschriften loggen', 'Max bei Rückstand benachrichtigen'],
+    },
+  ];
+
+  const EMAILS = [
+    {
+      id: 'e1', from: 'Thomas Müller', email: 't.mueller@gmail.com',
+      subject: 'Heizung defekt in Whg 3', time: 'Heute, 08:14', urgent: true,
+      badge: 'Reparatur', badgeColor: 'red', confidence: 94,
+      property: 'Musterstr. 4', unit: 'Whg 3', dringlichkeit: 'Hoch', kostenart: 'Heizung/Sanitär',
+      reason: 'Schlüsselwörter "Heizung defekt", Absender ist bekannter Mieter Whg 3.',
+      preview: 'Guten Morgen,\n\ndie Heizung in meiner Wohnung funktioniert seit heute früh nicht mehr. Es kommt kein warmes Wasser und die Heizkörper bleiben kalt. Bitte um schnelle Hilfe.\n\nFreundliche Grüße\nThomas Müller',
+    },
+    {
+      id: 'e2', from: 'Heizungsbau Meyer GmbH', email: 'info@heizungsbau-meyer.de',
+      subject: 'Rechnung #2026-0089 – Heizungswartung', time: 'Gestern, 16:42', urgent: false,
+      badge: 'Rechnung', badgeColor: 'amber', confidence: 98,
+      property: 'Musterstr. 4', unit: null, dringlichkeit: 'Normal', kostenart: 'Heizung/Wartung',
+      reason: 'PDF-Anhang mit Rechnungsstruktur erkannt. Bekannter Dienstleister aus Stammdaten.',
+      preview: 'Sehr geehrte Damen und Herren,\n\nim Anhang finden Sie unsere Rechnung #2026-0089 für die Heizungswartung vom 05.04.2026.\n\nGesamtbetrag: €480,00 · Fälligkeit: 30 Tage',
+    },
+    {
+      id: 'e3', from: 'Sabine Yilmaz', email: 's.yilmaz@web.de',
+      subject: 'Frage zur NK-Abrechnung 2025', time: 'Gestern, 11:23', urgent: false,
+      badge: 'Anfrage', badgeColor: 'blue', confidence: 87,
+      property: 'Musterstr. 4', unit: 'Whg 2', dringlichkeit: 'Normal', kostenart: null,
+      reason: 'Rückfrage zur Nebenkostenabrechnung erkannt. Absender ist bekannte Mieterin Whg 2.',
+      preview: 'Guten Tag,\n\nich habe Fragen zu meiner Nebenkostenabrechnung 2025. Konkret zum Posten "Hausmeisterservice" — dieser scheint im Vergleich zum Vorjahr sehr hoch. Könnten Sie mir die Belege zeigen?',
+    },
+    {
+      id: 'e4', from: 'Gebäudeversicherung AG', email: 'info@gebaeude-vers.de',
+      subject: 'Bestätigung Jahresprämie 2026', time: 'Mo, 09:05', urgent: false,
+      badge: 'Dokument', badgeColor: 'slate', confidence: 91,
+      property: null, unit: null, dringlichkeit: 'Niedrig', kostenart: 'Versicherungen',
+      reason: 'Bestätigungsmail erkannt. Kein sofortiger Handlungsbedarf. Archivierung empfohlen.',
+      preview: 'Sehr geehrte Damen und Herren,\n\nhiermit bestätigen wir den Eingang Ihrer Jahresprämie für die Gebäudeversicherung. Ihr Vertrag ist bis 31.12.2026 gültig.',
+    },
+  ];
+
+  const TASKS = [
+    { id: 'task1', color: 'blue', icon: '✓', title: 'Rechnung freigeben', desc: 'Rex: Rechnung #2026-0089 · Heizungsbau Meyer · €480', sub: 'Musterstr. 4', agent: 'Rex hat Beleg geprüft', btns: ['Freigeben', 'Ablehnen'] },
+    { id: 'task2', color: 'red', icon: '!', title: 'Mietrückstand · 14 Tage', desc: 'Müller · Whg 3 · April 2026 · €950 ausstehend', sub: 'Musterstr. 4', agent: 'Max hat Mahnung vorbereitet', btns: ['Mahnung senden', 'Zurückstellen'] },
+    { id: 'task3', color: 'amber', icon: '⟳', title: 'Wartung überfällig', desc: 'Aufzug · Bergweg 12 · letzte Wartung vor 13 Monaten', sub: 'Bergweg 12', agent: null, btns: ['Beauftragen', 'Zurückstellen'] },
+    { id: 'task4', color: 'slate', icon: '○', title: '3 Belege fehlen · NK 2025', desc: 'Diana: Hausmeister, Straßenreinigung, Gartenpflege', sub: 'Musterstr. 4', agent: 'Diana hat Liste erstellt', btns: ['Zur Checkliste'] },
+  ];
+
+  const BADGE_COLORS = {
+    red:   'bg-red-100 text-red-700',
+    amber: 'bg-amber-100 text-amber-700',
+    blue:  'bg-blue-100 text-blue-700',
+    slate: 'bg-slate-100 text-slate-600',
+    green: 'bg-green-100 text-green-700',
+    purple:'bg-purple-100 text-purple-700',
+  };
+
+  const TASK_COLORS = {
+    blue:  { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'bg-blue-100 text-blue-600', btn: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    red:   { bg: 'bg-red-50',  border: 'border-red-200',  icon: 'bg-red-100 text-red-600',   btn: 'bg-red-600 hover:bg-red-700 text-white' },
+    amber: { bg: 'bg-amber-50',border: 'border-amber-200',icon: 'bg-amber-100 text-amber-600',btn: 'bg-amber-600 hover:bg-amber-700 text-white' },
+    slate: { bg: 'bg-slate-50',border: 'border-slate-200',icon: 'bg-slate-100 text-slate-600',btn: 'bg-slate-700 hover:bg-slate-800 text-white' },
+  };
+
+  // ─── SIDEBAR ───────────────────────────────────────────────────────────────
+
+  const NAV_ITEMS = [
+    { id: 'dashboard',    label: 'Dashboard',    badge: 4 },
+    { id: 'portfolio',    label: 'Portfolio' },
+    { id: 'posteingang',  label: 'Posteingang',  badge: 4 },
+    { id: 'finanzen',     label: 'Finanzen' },
+    { id: 'ki-center',    label: 'KI-Center' },
+    { id: 'einstellungen',label: 'Einstellungen' },
+  ];
+
+  const NAV_ICONS = {
+    dashboard:    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" strokeWidth="2"/></svg>,
+    portfolio:    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22" strokeWidth="2"/></svg>,
+    posteingang:  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>,
+    finanzen:     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+    'ki-center':  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>,
+    einstellungen:<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3" strokeWidth="2"/></svg>,
+  };
+
+  function Sidebar({ view, setView }) {
+    return (
+      <aside className="w-56 bg-slate-900 flex flex-col h-full shrink-0">
+        <div className="px-5 py-5 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
+              <span className="text-white text-xs font-bold">A</span>
+            </div>
+            <span className="text-white font-semibold text-sm">Authaver</span>
+            <span className="ml-auto text-xs text-slate-600 font-mono">v2</span>
+          </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {NAV_ITEMS.map(item => (
+            <button
+              key={item.id}
+              onClick={() => setView(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                view === item.id
+                  ? 'bg-blue-600 text-white shadow-sm'
+                  : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+              }`}
+            >
+              <span className="shrink-0">{NAV_ICONS[item.id]}</span>
+              <span className="flex-1 text-left font-medium">{item.label}</span>
+              {item.badge && (
+                <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
+                  view === item.id ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-300'
+                }`}>{item.badge}</span>
+              )}
+            </button>
+          ))}
+        </nav>
+        <div className="px-4 py-4 border-t border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shrink-0">
+              <span className="text-xs text-white font-semibold">RZ</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-slate-300 truncate">Reyk Zepper</p>
+              <p className="text-xs text-slate-500">Haupteigentümer</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
+  // ─── DASHBOARD ─────────────────────────────────────────────────────────────
+
+  function Dashboard({ setView }) {
+    const [dismissed, setDismissed] = useState([]);
+    const tasks = TASKS.filter(t => !dismissed.includes(t.id));
+
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+
+          <div className="mb-7">
+            <h1 className="text-2xl font-bold text-slate-900">Guten Morgen, Reyk.</h1>
+            <p className="text-slate-500 mt-1 text-sm">Heute {tasks.length} Vorgänge die deine Aufmerksamkeit brauchen.</p>
+          </div>
+
+          {/* KI Summary */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-5 mb-7 flex gap-4">
+            <div className="w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center text-white text-sm shrink-0 mt-0.5">✦</div>
+            <div>
+              <p className="text-white text-sm font-semibold">KI-Zusammenfassung · Heute 07:15</p>
+              <p className="text-blue-100 text-sm mt-1 leading-relaxed">
+                Paula hat 4 neue Mails klassifiziert — 1 dringende Reparatur (Heizung Whg 3, Thomas Müller), 1 Rechnung zur Freigabe (€480). Zara meldet Mietrückstand Müller, April noch offen. Max hat Mahnung Stufe 1 vorbereitet und wartet auf deine Freigabe.
+              </p>
+            </div>
+          </div>
+
+          {/* Tasks */}
+          <div className="mb-7">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Offene Aufgaben</h2>
+            {tasks.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+                <p className="text-2xl mb-2">✓</p>
+                <p className="text-slate-500 text-sm">Alles erledigt. Gute Arbeit.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {tasks.map(task => {
+                  const c = TASK_COLORS[task.color];
+                  return (
+                    <div key={task.id} className={`rounded-2xl border ${c.border} ${c.bg} p-5`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-9 h-9 rounded-xl ${c.icon} flex items-center justify-center text-base font-bold shrink-0`}>
+                          {task.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900">{task.title}</p>
+                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">{task.desc}</p>
+                          {task.agent && (
+                            <p className="text-xs text-blue-600 mt-1.5">✦ {task.agent}</p>
+                          )}
+                          <p className="text-xs text-slate-400 mt-0.5">🏠 {task.sub}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        {task.btns.map((btn, i) => (
+                          <button
+                            key={btn}
+                            onClick={() => { if (i === 0) setDismissed(d => [...d, task.id]); }}
+                            className={`text-xs px-3 py-2 rounded-lg font-semibold transition-colors ${
+                              i === 0 ? c.btn : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+                            }`}
+                          >{btn}</button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Portfolio Strip */}
+          <div>
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Portfolio</h2>
+            <div className="grid grid-cols-3 gap-4">
+              {PROPERTIES.map(p => (
+                <button
+                  key={p.id}
+                  onClick={() => setView('liegenschaft')}
+                  className="text-left bg-white border border-slate-200 rounded-2xl p-4 hover:border-blue-300 hover:shadow-sm transition-all group"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{p.name}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{p.city}</p>
+                    </div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${BADGE_COLORS[p.type === 'WEG' ? 'purple' : 'slate']}`}>
+                      {p.type}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400">{p.units} Einh. · {p.occupied} belegt</span>
+                    {p.alerts > 0
+                      ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${BADGE_COLORS.amber}`}>⚠ {p.alerts}</span>
+                      : <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${BADGE_COLORS.green}`}>✓ OK</span>
+                    }
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ─── POSTEINGANG ───────────────────────────────────────────────────────────
+
+  function Posteingang({ setView }) {
+    const [selectedId, setSelectedId] = useState('e1');
+    const mail = EMAILS.find(e => e.id === selectedId);
+
+    return (
+      <div className="h-full flex overflow-hidden">
+
+        {/* Column 1: Mail List */}
+        <div className="w-64 border-r border-slate-200 bg-white flex flex-col shrink-0">
+          <div className="px-4 py-4 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Posteingang</p>
+            <p className="text-xs text-slate-400 mt-0.5">4 neue Nachrichten · Paula aktiv</p>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {EMAILS.map(e => (
+              <button
+                key={e.id}
+                onClick={() => setSelectedId(e.id)}
+                className={`w-full text-left px-4 py-3.5 border-b border-slate-100 transition-all ${
+                  selectedId === e.id
+                    ? 'bg-blue-50 border-l-2 border-l-blue-500'
+                    : 'hover:bg-slate-50 border-l-2 border-l-transparent'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className={`text-xs font-semibold truncate ${e.urgent ? 'text-red-600' : 'text-slate-800'}`}>{e.from}</p>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0 ${BADGE_COLORS[e.badgeColor]}`}>{e.badge}</span>
+                </div>
+                <p className="text-xs text-slate-600 truncate">{e.subject}</p>
+                <p className="text-xs text-slate-400 mt-1">{e.time}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Column 2: Mail Content */}
+        {mail && (
+          <div className="flex-1 overflow-y-auto bg-white border-r border-slate-200">
+            <div className="px-7 py-5 border-b border-slate-100 sticky top-0 bg-white z-10">
+              <h3 className="text-sm font-semibold text-slate-900">{mail.subject}</h3>
+              <p className="text-xs text-slate-400 mt-1">Von: <span className="text-slate-600">{mail.from}</span> &lt;{mail.email}&gt; · {mail.time}</p>
+            </div>
+            <div className="px-7 py-6">
+              <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{mail.preview}</p>
+              <div className="mt-6 pt-6 border-t border-slate-100 flex gap-2">
+                <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-colors font-medium">Antworten</button>
+                <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg transition-colors font-medium">Weiterleiten</button>
+                <button className="text-xs text-slate-400 hover:text-slate-600 px-2 py-1.5 transition-colors">Archivieren</button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Column 3: Paula Panel */}
+        {mail && (
+          <div className="w-72 bg-slate-50 overflow-y-auto shrink-0 flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-200 bg-white flex items-center gap-3">
+              <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">✦</div>
+              <div>
+                <p className="text-xs font-semibold text-slate-900">Paula · Vorschlag</p>
+                <p className="text-xs text-slate-400">Confidence {mail.confidence}%</p>
+              </div>
+            </div>
+
+            <div className="flex-1 px-5 py-4 space-y-4">
+              {/* Klassifikation */}
+              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5">
+                <Row label="Typ" val={<span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_COLORS[mail.badgeColor]}`}>{mail.badge}</span>} />
+                {mail.property && <Row label="Liegenschaft" val={mail.property} />}
+                {mail.unit && <Row label="Einheit" val={mail.unit} />}
+                <Row label="Dringlichkeit" val={
+                  <span className={`text-xs font-medium ${
+                    mail.dringlichkeit === 'Hoch' ? 'text-red-600' :
+                    mail.dringlichkeit === 'Niedrig' ? 'text-slate-400' : 'text-slate-700'
+                  }`}>{mail.dringlichkeit}</span>
+                } />
+                {mail.kostenart && <Row label="Kostenart" val={mail.kostenart} />}
+              </div>
+
+              {/* Confidence Bar */}
+              <div>
+                <div className="flex justify-between text-xs text-slate-400 mb-1.5">
+                  <span>Confidence</span>
+                  <span className={mail.confidence >= 90 ? 'text-green-600 font-medium' : mail.confidence >= 70 ? 'text-amber-600 font-medium' : 'text-red-600 font-medium'}>{mail.confidence}%</span>
+                </div>
+                <div className="h-1.5 bg-slate-200 rounded-full overflow-hidden">
+                  <div
+                    className={`h-full rounded-full transition-all ${mail.confidence >= 90 ? 'bg-green-500' : mail.confidence >= 70 ? 'bg-amber-500' : 'bg-red-500'}`}
+                    style={{ width: `${mail.confidence}%` }}
+                  />
+                </div>
+              </div>
+
+              {/* Begründung */}
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5">
+                <p className="text-xs font-semibold text-blue-800 mb-1.5">Begründung</p>
+                <p className="text-xs text-blue-700 leading-relaxed">{mail.reason}</p>
+              </div>
+
+              {/* Actions */}
+              <div className="space-y-2">
+                <button
+                  onClick={() => setView('vorgang-detail')}
+                  className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 rounded-xl transition-colors"
+                >
+                  Vorgang anlegen →
+                </button>
+                <button className="w-full bg-white hover:bg-slate-100 text-slate-700 text-xs font-medium py-2 rounded-xl border border-slate-200 transition-colors">
+                  Klassifikation korrigieren
+                </button>
+                <button className="w-full text-slate-400 hover:text-slate-600 text-xs py-1.5 transition-colors text-center">
+                  Ignorieren / Archivieren
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  function Row({ label, val }) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-slate-400 shrink-0">{label}</span>
+        <span className="text-xs font-medium text-slate-800 text-right">{val}</span>
+      </div>
+    );
+  }
+
+  // ─── VORGANG DETAIL ────────────────────────────────────────────────────────
+
+  function VorgangDetail({ setView }) {
+    const [tab, setTab] = useState('Verlauf');
+    const TABS = ['Verlauf', 'Finanzen', 'Dokumente', 'Kommunikation', 'KI-Protokoll'];
+
+    const verlauf = [
+      { time: 'Heute 08:14', actor: 'Paula (KI)', avatar: '✦', ai: true, text: 'Mail von Thomas Müller empfangen und als Reparatur klassifiziert (Confidence 94%). Liegenschaft: Musterstr. 4, Einheit: Whg 3. Vorgang angelegt, auf Bestätigung durch Eigentümer gewartet.' },
+      { time: 'Heute 08:16', actor: 'Reyk Zepper', avatar: 'RZ', ai: false, text: 'Vorgang bestätigt. Dringlichkeit auf "Hoch" gesetzt.' },
+    ];
+
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-4xl mx-auto px-8 py-8">
+
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-6">
+            <button onClick={() => setView('posteingang')} className="hover:text-blue-600 transition-colors">Posteingang</button>
+            <span>›</span>
+            <span className="text-slate-600 font-medium">Vorgang #V-2026-0341</span>
+          </div>
+
+          {/* Header */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 bg-red-100 rounded-2xl flex items-center justify-center text-xl shrink-0">🔧</div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">Reparatur</span>
+                    <span className="text-xs text-slate-400 font-mono">#V-2026-0341</span>
+                    <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">✦ Von Paula erstellt</span>
+                  </div>
+                  <h1 className="text-xl font-bold text-slate-900">Heizung defekt</h1>
+                  <div className="flex flex-wrap items-center gap-3 mt-2">
+                    <span className="text-xs text-slate-500">🏠 Musterstr. 4</span>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="text-xs text-slate-500">📍 Whg 3</span>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="text-xs text-slate-500">📂 Heizung/Sanitär</span>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="text-xs text-slate-500">📅 Apr 2026</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full">● Offen</span>
+                <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors">Freigeben</button>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-4 gap-4">
+              {[
+                { label: 'Verantwortlich', val: 'Reyk Zepper' },
+                { label: 'Erstellt von',   val: 'Paula (KI)' },
+                { label: 'Erstellt',       val: '07.04.2026 08:14' },
+                { label: 'Dringlichkeit',  val: '🔴 Hoch' },
+              ].map(f => (
+                <div key={f.label}>
+                  <p className="text-xs text-slate-400">{f.label}</p>
+                  <p className="text-sm font-semibold text-slate-900 mt-0.5">{f.val}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Reparatur Details */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-4">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Reparatur-Details</p>
+            <div className="grid grid-cols-3 gap-4 mb-5">
+              {[
+                { label: 'Gewerk', val: 'Heizung / Sanitär', empty: false },
+                { label: 'Dienstleister', val: 'Noch nicht beauftragt', empty: true },
+                { label: 'Termin', val: 'Noch nicht gesetzt', empty: true },
+              ].map(f => (
+                <div key={f.label} className={`p-4 rounded-xl border ${f.empty ? 'border-dashed border-slate-200 bg-slate-50' : 'border-slate-200'}`}>
+                  <p className="text-xs text-slate-400">{f.label}</p>
+                  <p className={`text-sm font-medium mt-1 ${f.empty ? 'text-slate-300' : 'text-slate-900'}`}>{f.val}</p>
+                  <button className="text-xs text-blue-600 mt-1.5 hover:underline">Bearbeiten</button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-2">Fotos / Anhänge</p>
+              <div className="flex gap-2">
+                <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center cursor-pointer hover:border-blue-300 transition-colors">
+                  <span className="text-slate-300 text-xl font-thin">+</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="flex border-b border-slate-100 overflow-x-auto">
+              {TABS.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-5 py-3.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                    tab === t ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >{t}</button>
+              ))}
+            </div>
+            <div className="p-6">
+              {tab === 'Verlauf' && (
+                <div className="space-y-5">
+                  {verlauf.map((item, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                        item.ai ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'
+                      }`}>{item.avatar}</div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-900">{item.actor}</span>
+                          <span className="text-xs text-slate-400">{item.time}</span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed mt-0.5">{item.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-1">
+                    <input type="text" placeholder="Notiz hinzufügen..." className="w-full text-xs px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-400 bg-slate-50 transition-colors" />
+                  </div>
+                </div>
+              )}
+              {tab === 'KI-Protokoll' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold text-blue-900">Paula · 07.04.2026 08:14</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_COLORS.green}`}>Confidence 94%</span>
+                    </div>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      Typ erkannt: Reparatur. Absender Thomas Müller ist als Mieter Whg 3, Musterstr. 4 in Stammdaten hinterlegt. Schlüsselwörter: "Heizung", "defekt", "kein warmes Wasser". Dringlichkeit Hoch gesetzt. Vorgang #V-2026-0341 erstellt, Eigentümerbestätigung angefordert.
+                    </p>
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-blue-200">
+                      <span className="text-xs text-blue-600 font-medium">Token: 320</span>
+                      <span className="text-xs text-blue-600 font-medium">Aktion: Vorgang erstellt</span>
+                      <span className="text-xs text-blue-600 font-medium">Model: claude-sonnet</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!['Verlauf', 'KI-Protokoll'].includes(tab) && (
+                <div className="text-center py-8">
+                  <p className="text-slate-300 text-sm">— Noch keine Einträge —</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ─── LIEGENSCHAFT COCKPIT ──────────────────────────────────────────────────
+
+  function LiegenschaftCockpit({ setView }) {
+    const [subNav, setSubNav] = useState('Übersicht');
+    const SUB_NAV = ['Übersicht', 'Vorgänge', 'Mieter', 'Finanzen', 'WEG', 'Dokumente'];
+    const p = PROPERTIES[0];
+
+    const units = [
+      { label: 'Whg 1', tenant: 'Schmidt, K.', status: 'bezahlt',   rent: 950  },
+      { label: 'Whg 2', tenant: 'Yilmaz, S.', status: 'bezahlt',   rent: 1100 },
+      { label: 'Whg 3', tenant: 'Müller, T.', status: 'rückstand', rent: 1150, alerts: 2 },
+      { label: 'Whg 4', tenant: '—',          status: 'leer',      rent: null  },
+    ];
+
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        {/* Property Header */}
+        <div className="bg-white border-b border-slate-200 px-8 pt-6 shrink-0">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
+                <button onClick={() => setView('portfolio')} className="hover:text-blue-600 transition-colors">Portfolio</button>
+                <span>›</span>
+                <span className="text-slate-600 font-medium">{p.name}</span>
+              </div>
+              <h1 className="text-xl font-bold text-slate-900">{p.name}</h1>
+              <p className="text-sm text-slate-400 mt-0.5">{p.city} · 4 Einheiten · Mietverwaltung</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${BADGE_COLORS.amber}`}>⚠ 2 offene Vorgänge</span>
+              <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">Bearbeiten</button>
+            </div>
+          </div>
+          <div className="flex">
+            {SUB_NAV.map(item => (
+              <button
+                key={item}
+                onClick={() => setSubNav(item)}
+                className={`px-4 py-2.5 text-sm font-semibold transition-colors border-b-2 ${
+                  subNav === item
+                    ? 'text-blue-600 border-blue-600'
+                    : 'text-slate-400 border-transparent hover:text-slate-700'
+                }`}
+              >{item}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto bg-slate-50">
+          <div className="max-w-5xl mx-auto px-8 py-6">
+            {subNav === 'Übersicht' && (
+              <>
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  {[
+                    { label: 'Mietsoll / Monat', val: '€4.200', sub: '3 von 4 bezahlt', col: 'text-slate-900' },
+                    { label: 'Rückstände',        val: '€950',   sub: 'Müller, Whg 3',   col: 'text-red-600' },
+                    { label: 'Offene Vorgänge',   val: '2',      sub: '1 Reparatur, 1 Rechnung', col: 'text-amber-600' },
+                    { label: 'NK 2025',           val: '3 fehlen', sub: 'Diana angefragt',  col: 'text-blue-600' },
+                  ].map(s => (
+                    <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-4">
+                      <p className="text-xs text-slate-400">{s.label}</p>
+                      <p className={`text-2xl font-bold mt-1 ${s.col}`}>{s.val}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{s.sub}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Units */}
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
+                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900">Einheiten</h3>
+                    <button className="text-xs text-blue-600 hover:underline font-medium">+ Einheit hinzufügen</button>
+                  </div>
+                  {units.map((u, i) => (
+                    <div key={i} className={`px-5 py-4 flex items-center gap-4 ${i < units.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                      <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-slate-600">{u.label.replace('Whg ', '')}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">{u.label}</p>
+                        <p className="text-xs text-slate-400">{u.tenant}</p>
+                      </div>
+                      <div className="text-right">
+                        {u.rent && <p className="text-sm font-bold text-slate-900">€{u.rent}</p>}
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          u.status === 'bezahlt'   ? BADGE_COLORS.green :
+                          u.status === 'rückstand' ? BADGE_COLORS.red :
+                          BADGE_COLORS.slate
+                        }`}>
+                          {u.status === 'bezahlt' ? '✓ Bezahlt' : u.status === 'rückstand' ? '⚠ Rückstand' : 'Leer'}
+                        </span>
+                      </div>
+                      {u.alerts > 0 && (
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_COLORS.amber}`}>{u.alerts} offen</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* KI Activity */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                  <h3 className="text-sm font-semibold text-slate-900 mb-4">KI-Aktivität · letzte 24h</h3>
+                  <div className="space-y-3">
+                    {[
+                      { agent: 'Paula',  text: '2 Mails klassifiziert — 1 Reparatur (Heizung), 1 Anfrage NK', time: 'vor 4 Min' },
+                      { agent: 'Rex',    text: 'Rechnung #2026-0089 geprüft, €480, Freigabe angefordert', time: 'gestern 16:45' },
+                      { agent: 'Zara',   text: 'Mietrückstand Müller erkannt, Max benachrichtigt', time: 'heute 06:00' },
+                      { agent: 'Max',    text: 'Mahnung Stufe 1 für Müller vorbereitet, wartet auf Freigabe', time: 'heute 07:02' },
+                    ].map((a, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-blue-600 w-12 shrink-0">{a.agent}</span>
+                        <span className="text-xs text-slate-600 flex-1">{a.text}</span>
+                        <span className="text-xs text-slate-400 shrink-0">{a.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+            {subNav !== 'Übersicht' && (
+              <div className="bg-white rounded-2xl border border-slate-200 p-16 text-center">
+                <p className="text-slate-300">— {subNav}-Ansicht (in Planung) —</p>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── KI CENTER ─────────────────────────────────────────────────────────────
+
+  function KICenter() {
+    const [expanded, setExpanded] = useState(null);
+
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">KI-Center</h1>
+              <p className="text-slate-500 mt-1 text-sm">5 aktive Agenten · 2 Aktionen heute · Alle Systeme OK</p>
+            </div>
+            <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors">
+              + Neuer Agent
+            </button>
+          </div>
+
+          <div className="space-y-3 mb-8">
+            {AGENTS.map(a => (
+              <div key={a.id} className={`bg-white rounded-2xl border transition-all ${expanded === a.id ? 'border-blue-300 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}>
+                <button
+                  onClick={() => setExpanded(expanded === a.id ? null : a.id)}
+                  className="w-full text-left px-5 py-4 flex items-center gap-4"
+                >
+                  <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-xl shrink-0">{a.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">{a.name}</span>
+                      <span className="text-xs text-slate-400">— {a.role}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{a.lastAction}</p>
+                  </div>
+                  <div className="flex items-center gap-5 shrink-0">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Token-Budget</p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${a.tokenUsed}%` }} />
+                        </div>
+                        <span className="text-xs text-slate-500 font-medium">{a.tokenUsed}%</span>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${
+                      a.status === 'active' ? BADGE_COLORS.green :
+                      a.status === 'alert'  ? BADGE_COLORS.red :
+                      BADGE_COLORS.slate
+                    }`}>
+                      {a.status === 'active' ? '● Aktiv' : a.status === 'alert' ? '⚠ Alert' : '⏸ Pause'}
+                    </span>
+                    <span className="text-xs text-slate-400 w-24 text-right">{a.heartbeat}</span>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${expanded === a.id ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" d="M9 5l7 7-7 7"/></svg>
+                  </div>
+                </button>
+
+                {expanded === a.id && (
+                  <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Funktionen & Ablaufschritte</p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {a.funcs.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                          <span className="text-xs font-bold text-blue-500 w-4">{i + 1}</span>
+                          <span className="text-xs text-slate-700">{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">⏸ Pausieren</button>
+                      <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">📋 Log ansehen</button>
+                      <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">⚙ Konfigurieren</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Agent Builder */}
+          <div className="bg-slate-900 rounded-2xl p-6">
+            <div className="flex items-start gap-4 mb-5">
+              <div className="w-10 h-10 bg-slate-700 rounded-2xl flex items-center justify-center text-xl shrink-0">🛠</div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-white font-bold text-sm">Agent-Builder</p>
+                  <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full">Nur Haupteigentümer</span>
+                </div>
+                <p className="text-slate-400 text-xs mt-0.5">Neuen spezialisierten Agenten aus Vorlage konfigurieren oder von Grund auf anlegen.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { name: 'Wartungsagent', desc: 'Überwacht Intervalle, erstellt Aufgaben' },
+                { name: 'Reporting-Agent', desc: 'Erstellt wöchentliche Zusammenfassungen' },
+                { name: 'Kommunikationsagent', desc: 'Verwaltet Mieter-Korrespondenz' },
+              ].map(t => (
+                <button key={t.name} className="bg-slate-800 hover:bg-slate-700 rounded-xl p-4 text-left border border-slate-700 transition-colors">
+                  <p className="text-sm font-semibold text-slate-200">{t.name}</p>
+                  <p className="text-xs text-slate-500 mt-1">{t.desc}</p>
+                  <span className="inline-block mt-2 text-xs text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded-full">Template</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PORTFOLIO ─────────────────────────────────────────────────────────────
+
+  function Portfolio({ setView }) {
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Portfolio</h1>
+              <p className="text-slate-500 mt-1 text-sm">3 Liegenschaften · 22 Einheiten · 20 belegt · 2 leer</p>
+            </div>
+            <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors">
+              + Liegenschaft
+            </button>
+          </div>
+          <div className="space-y-4">
+            {PROPERTIES.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setView('liegenschaft')}
+                className="w-full text-left bg-white border border-slate-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 bg-blue-50 rounded-2xl flex items-center justify-center text-xl shrink-0 group-hover:bg-blue-100 transition-colors">🏠</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{p.name}</h3>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_COLORS[p.type === 'WEG' ? 'purple' : 'slate']}`}>{p.type}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{p.city} · {p.units} Einheiten · {p.occupied} belegt · {p.vacant} leer</p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="text-sm font-bold text-slate-900">
+                      {p.rent ? `€${p.rent.toLocaleString('de')}/Mo` : `€${p.hausgeld.toLocaleString('de')}/Mo HG`}
+                    </span>
+                    {p.alerts > 0
+                      ? <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${BADGE_COLORS.amber}`}>⚠ {p.alerts} offen</span>
+                      : <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${BADGE_COLORS.green}`}>✓ OK</span>
+                    }
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PLACEHOLDER ───────────────────────────────────────────────────────────
+
+  function Placeholder({ label }) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-50">
+        <p className="text-slate-300 text-sm">{label} · in Planung</p>
+      </div>
+    );
+  }
+
+  // ─── APP ───────────────────────────────────────────────────────────────────
+
+  function App() {
+    const [view, setView] = useState('dashboard');
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar view={view} setView={setView} />
+        <main className="flex-1 overflow-hidden">
+          {view === 'dashboard'     && <Dashboard setView={setView} />}
+          {view === 'portfolio'     && <Portfolio setView={setView} />}
+          {view === 'posteingang'   && <Posteingang setView={setView} />}
+          {view === 'vorgang-detail'&& <VorgangDetail setView={setView} />}
+          {view === 'liegenschaft'  && <LiegenschaftCockpit setView={setView} />}
+          {view === 'ki-center'     && <KICenter />}
+          {view === 'finanzen'      && <Placeholder label="Finanzen" />}
+          {view === 'einstellungen' && <Placeholder label="Einstellungen" />}
+        </main>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
