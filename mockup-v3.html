@@ -1,0 +1,874 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Authaver — Mockup v3</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', -apple-system, sans-serif; box-sizing: border-box; }
+    html, body, #root { height: 100%; margin: 0; padding: 0; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+  const { useState } = React;
+
+  // ─── DATA ──────────────────────────────────────────────────────────────────
+
+  const PROPERTIES = [
+    { id: 'p1', name: 'Musterstraße 4', city: 'Berlin-Mitte', type: 'Miete', units: 4, occupied: 3, vacant: 1, alerts: 2, rent: 4200 },
+    { id: 'p2', name: 'Bergweg 12', city: 'Berlin-Prenzlauer Berg', type: 'Miete', units: 6, occupied: 6, vacant: 0, alerts: 1, rent: 7800 },
+    { id: 'p3', name: 'Parkstraße 7', city: 'Berlin-Charlottenburg', type: 'WEG', units: 12, occupied: 11, vacant: 1, alerts: 1, hausgeld: 8400 },
+  ];
+
+  const AGENTS = [
+    { id: 'paula', name: 'Paula', role: 'Posteingang & Klassifikation', icon: '📬', status: 'active', heartbeat: 'alle 15 Min', tokenUsed: 18, lastAction: 'vor 4 Min · 2 Mails klassifiziert', funcs: ['Mail empfangen & einlesen', 'Absender identifizieren', 'Typ erkennen', 'Vorgang vorschlagen', 'Bei < 70% → Nutzer entscheiden', 'Aktion loggen'] },
+    { id: 'rex', name: 'Rex', role: 'Rechnungsprüfer', icon: '🔍', status: 'active', heartbeat: 'bei Eingang', tokenUsed: 9, lastAction: 'gestern · Rechnung #0089 geprüft', funcs: ['Rechnung empfangen & OCR', 'Ticketabgleich', 'Betrag plausibilisieren', 'Buchungsvorschlag', 'Abweichungen flaggen', 'Freigabe anfordern'] },
+    { id: 'max', name: 'Max', role: 'Mahnwesen', icon: '⚡', status: 'active', heartbeat: 'täglich 07:00', tokenUsed: 5, lastAction: 'heute 07:02 · Mahnung Müller', funcs: ['Rückstände prüfen', 'Mahnstufe bestimmen', 'Mahnschreiben entwerfen', 'Fristen überwachen', 'Eskalation vorschlagen', 'Aktion loggen'] },
+    { id: 'diana', name: 'Diana', role: 'Dokumenten-Archivarin', icon: '📁', status: 'active', heartbeat: 'bei Eingang', tokenUsed: 12, lastAction: 'vor 1 Std · Protokoll archiviert', funcs: ['Dokument empfangen & OCR', 'Typ klassifizieren', 'Objekt/Einheit zuordnen', 'Archivieren', 'Lücken erkennen', 'Fehlende Belege anfragen'] },
+    { id: 'zara', name: 'Zara', role: 'Zahlungsmonitor', icon: '💳', status: 'alert', heartbeat: 'täglich 06:00', tokenUsed: 1, lastAction: 'heute 06:00 · Rückstand Müller erkannt', funcs: ['Kontoauszüge einlesen', 'Soll/Ist abgleichen', 'Rückstände erkennen', 'Zahlungen zuordnen', 'Rücklastschriften loggen', 'Max benachrichtigen'] },
+  ];
+
+  const EMAILS = [
+    { id: 'e1', from: 'Thomas Müller', subject: 'Heizung defekt in Whg 3', time: 'Heute, 08:14', urgent: true, badge: 'Reparatur', badgeColor: 'red', confidence: 94, property: 'Musterstr. 4', unit: 'Whg 3', dringlichkeit: 'Hoch', kostenart: 'Heizung/Sanitär', reason: 'Schlüsselwörter "Heizung defekt", Absender ist bekannter Mieter Whg 3.', preview: 'Guten Morgen,\n\ndie Heizung in meiner Wohnung funktioniert seit heute früh nicht mehr. Es kommt kein warmes Wasser und die Heizkörper bleiben kalt.\n\nFreundliche Grüße\nThomas Müller' },
+    { id: 'e2', from: 'Heizungsbau Meyer GmbH', subject: 'Rechnung #2026-0089 – Heizungswartung', time: 'Gestern, 16:42', urgent: false, badge: 'Rechnung', badgeColor: 'amber', confidence: 98, property: 'Musterstr. 4', unit: null, dringlichkeit: 'Normal', kostenart: 'Heizung/Wartung', reason: 'PDF-Anhang erkannt. Bekannter Dienstleister.', preview: 'Im Anhang Rechnung #2026-0089 für Heizungswartung, €480,00 · Fälligkeit 30 Tage.' },
+    { id: 'e3', from: 'Sabine Yilmaz', subject: 'Frage zur NK-Abrechnung 2025', time: 'Gestern, 11:23', urgent: false, badge: 'Anfrage', badgeColor: 'blue', confidence: 87, property: 'Musterstr. 4', unit: 'Whg 2', dringlichkeit: 'Normal', kostenart: null, reason: 'Rückfrage NK, Absender ist Mieterin Whg 2.', preview: 'Guten Tag,\n\nich habe Fragen zum Posten "Hausmeisterservice" in der NK-Abrechnung 2025. Können Sie mir die Belege zeigen?' },
+    { id: 'e4', from: 'Gebäudeversicherung AG', subject: 'Bestätigung Jahresprämie 2026', time: 'Mo, 09:05', urgent: false, badge: 'Dokument', badgeColor: 'slate', confidence: 91, property: null, unit: null, dringlichkeit: 'Niedrig', kostenart: 'Versicherungen', reason: 'Bestätigung erkannt, kein Handlungsbedarf.', preview: 'Hiermit bestätigen wir den Eingang Ihrer Jahresprämie. Ihr Vertrag gilt bis 31.12.2026.' },
+  ];
+
+  const TASKS = [
+    { id: 't1', color: 'blue',  icon: '✓', title: 'Rechnung freigeben',     desc: 'Rex: Rechnung #2026-0089 · Heizungsbau Meyer · €480', sub: 'Musterstr. 4', agent: 'Rex hat Beleg geprüft',      btns: ['Freigeben', 'Ablehnen'] },
+    { id: 't2', color: 'red',   icon: '!', title: 'Mietrückstand · 14 Tage', desc: 'Müller · Whg 3 · April 2026 · €950 ausstehend',       sub: 'Musterstr. 4', agent: 'Max hat Mahnung vorbereitet', btns: ['Mahnung senden', 'Zurückstellen'] },
+    { id: 't3', color: 'amber', icon: '⟳', title: 'Wartung überfällig',      desc: 'Aufzug · Bergweg 12 · letzte Wartung vor 13 Monaten',  sub: 'Bergweg 12',  agent: null,                         btns: ['Beauftragen', 'Zurückstellen'] },
+    { id: 't4', color: 'slate', icon: '○', title: '3 Belege fehlen · NK 2025',desc: 'Diana: Hausmeister, Straßenreinigung, Gartenpflege',  sub: 'Musterstr. 4', agent: 'Diana hat Liste erstellt',   btns: ['Zur Checkliste'] },
+  ];
+
+  const REPARATUREN = [
+    { id: 'r1', nr: '#V-2026-0341', title: 'Heizung defekt',     einheit: 'Whg 3', gewerk: 'Heizung/Sanitär', dringlichkeit: 'Hoch',   status: 'Offen',        erstellt: '07.04.', dienstleister: null,              aiErstellt: true },
+    { id: 'r2', nr: '#V-2026-0338', title: 'Fenster klemmt',     einheit: 'Whg 1', gewerk: 'Schreiner',       dringlichkeit: 'Normal', status: 'In Arbeit',    erstellt: '02.04.', dienstleister: 'Tischler Meier',   aiErstellt: true },
+    { id: 'r3', nr: '#V-2026-0321', title: 'Wasserhahn tropft',  einheit: 'Whg 2', gewerk: 'Sanitär',         dringlichkeit: 'Niedrig',status: 'Abgeschlossen',erstellt: '15.03.', dienstleister: 'Klempner Schulz',  aiErstellt: false },
+  ];
+
+  const WARTUNGEN = [
+    { id: 'w1', anlage: 'Aufzug',          typ: 'Aufzug',      intervall: 'Halbjährlich', letzter: '01.10.2025', naechster: '01.04.2026', status: 'Fällig',     dienstleister: 'Lift Service GmbH' },
+    { id: 'w2', anlage: 'Heizungsanlage',  typ: 'Heizung',     intervall: 'Jährlich',     letzter: '10.03.2025', naechster: '10.03.2026', status: 'Überfällig', dienstleister: 'Heizungsbau Meyer' },
+    { id: 'w3', anlage: 'Rauchwarnmelder', typ: 'Brandschutz', intervall: 'Jährlich',     letzter: '15.01.2026', naechster: '15.01.2027', status: 'OK',         dienstleister: 'Securitas GmbH' },
+    { id: 'w4', anlage: 'Feuerlöscher',    typ: 'Brandschutz', intervall: '2-jährlich',   letzter: '20.06.2024', naechster: '20.06.2026', status: 'OK',         dienstleister: 'Brandschutz Nord' },
+  ];
+
+  const MASSNAHMEN = [
+    { id: 'm1', titel: 'Dachsanierung',    typ: 'Instandsetzung', budget: 45000, ist: 12400, beschluss: 'ETV 11/2025', status: 'In Planung',     zeitraum: 'Q3 2026' },
+    { id: 'm2', titel: 'Fassadenanstrich', typ: 'Modernisierung',  budget: 18000, ist: 18000, beschluss: 'ETV 03/2024', status: 'Abgeschlossen',  zeitraum: 'Q2 2025' },
+  ];
+
+  const NK_STEPS = [
+    { id: 1, label: 'Belege sammeln',    status: 'done',    info: '12 / 15 Belege' },
+    { id: 2, label: 'Kostenarten',       status: 'done',    info: '8 Positionen' },
+    { id: 3, label: 'Schlüssel',         status: 'active',  info: '3 offen' },
+    { id: 4, label: 'Verbrauch',         status: 'pending', info: '' },
+    { id: 5, label: 'Vorauszahlungen',   status: 'pending', info: '' },
+    { id: 6, label: 'Entwurf',           status: 'pending', info: '' },
+    { id: 7, label: 'Prüfung',           status: 'pending', info: '' },
+    { id: 8, label: 'Versand',           status: 'pending', info: '' },
+  ];
+
+  const KOSTENARTEN = [
+    { id: 'k1', name: 'Wasser / Entwässerung', betrag: 1840, umlagefaehig: true,  schluessel: 'Wohnfläche', belege: 2, belegStatus: 'vollständig' },
+    { id: 'k2', name: 'Heizkosten',             betrag: 4200, umlagefaehig: true,  schluessel: 'Verbrauch',  belege: 1, belegStatus: 'vollständig' },
+    { id: 'k3', name: 'Müllabfuhr',             betrag: 620,  umlagefaehig: true,  schluessel: 'Einheiten',  belege: 1, belegStatus: 'vollständig' },
+    { id: 'k4', name: 'Hausmeisterservice',      betrag: 2400, umlagefaehig: true,  schluessel: 'Wohnfläche', belege: 0, belegStatus: 'fehlt' },
+    { id: 'k5', name: 'Straßenreinigung',        betrag: 380,  umlagefaehig: true,  schluessel: 'Einheiten',  belege: 0, belegStatus: 'fehlt' },
+    { id: 'k6', name: 'Verwaltungskosten',        betrag: 1200, umlagefaehig: false, schluessel: null,         belege: 1, belegStatus: 'nicht umlagefähig' },
+  ];
+
+  const BANK_BEWEGUNGEN = [
+    { id: 'b1', datum: '05.04.', betrag: 1100,  verwendung: 'Miete April Yilmaz Whg2', von: 'Sabine Yilmaz',        status: 'zugeordnet', zuordnung: 'Miete Whg 2 Apr',   kiConf: null },
+    { id: 'b2', datum: '03.04.', betrag: 480,   verwendung: 'RE 2026-0089',             von: 'Heizungsbau Meyer',    status: 'zugeordnet', zuordnung: 'Rechnung #0089',     kiConf: null },
+    { id: 'b3', datum: '01.04.', betrag: 950,   verwendung: 'April Miete',              von: 'Unbekannt',            status: 'vorschlag',  zuordnung: null,                 kiConf: 85, kiVorschlag: 'Müller Whg 3 Apr' },
+    { id: 'b4', datum: '01.04.', betrag: 1250,  verwendung: 'Schmidt April 2026',       von: 'Klaus Schmidt',        status: 'vorschlag',  zuordnung: null,                 kiConf: 97, kiVorschlag: 'Miete Whg 1 Apr' },
+  ];
+
+  const OFFENE_POSTEN = [
+    { id: 'op1', typ: 'Miete',    desc: 'Miete Whg 1 · Schmidt · Apr 2026',       betrag: 950,  faellig: '01.04.', status: 'offen' },
+    { id: 'op2', typ: 'Miete',    desc: 'Miete Whg 3 · Müller · Apr 2026',        betrag: 1150, faellig: '01.04.', status: 'rückstand' },
+    { id: 'op3', typ: 'Rechnung', desc: 'Rechnung #0089 · Heizungsbau Meyer',      betrag: 480,  faellig: '05.05.', status: 'freigegeben' },
+    { id: 'op4', typ: 'Miete',    desc: 'Miete Whg 2 · Yilmaz · Apr 2026',        betrag: 1100, faellig: '01.04.', status: 'bezahlt' },
+  ];
+
+  const VERLAUF = [
+    { time: 'Heute 08:14', actor: 'Paula (KI)', avatar: '✦', ai: true,  type: 'ki',   text: 'Mail von Thomas Müller empfangen und als Reparatur klassifiziert (Confidence 94%). Vorgang #V-2026-0341 angelegt.' },
+    { time: 'Heute 08:16', actor: 'Reyk Zepper', avatar: 'RZ', ai: false, type: 'user', text: 'Vorgang bestätigt. Dringlichkeit: Hoch.' },
+    { time: 'Heute 08:17', actor: 'Thomas Müller (Mail)', avatar: '✉', ai: false, type: 'mail', text: '"die Heizung funktioniert seit heute früh nicht mehr. Kein warmes Wasser."' },
+    { time: 'Heute 09:30', actor: 'Reyk Zepper', avatar: 'RZ', ai: false, type: 'user', text: 'Heizungsbau Meyer GmbH kontaktiert. Termin für morgen 10:00 Uhr vereinbart.' },
+  ];
+
+  const BC = {
+    red:    'bg-red-100 text-red-700',
+    amber:  'bg-amber-100 text-amber-700',
+    blue:   'bg-blue-100 text-blue-700',
+    slate:  'bg-slate-100 text-slate-600',
+    green:  'bg-green-100 text-green-700',
+    purple: 'bg-purple-100 text-purple-700',
+    orange: 'bg-orange-100 text-orange-700',
+  };
+
+  const TC = {
+    blue:  { bg: 'bg-blue-50',  border: 'border-blue-200',  icon: 'bg-blue-100 text-blue-600',  btn: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    red:   { bg: 'bg-red-50',   border: 'border-red-200',   icon: 'bg-red-100 text-red-600',    btn: 'bg-red-600 hover:bg-red-700 text-white' },
+    amber: { bg: 'bg-amber-50', border: 'border-amber-200', icon: 'bg-amber-100 text-amber-600',btn: 'bg-amber-600 hover:bg-amber-700 text-white' },
+    slate: { bg: 'bg-slate-50', border: 'border-slate-200', icon: 'bg-slate-100 text-slate-600',btn: 'bg-slate-700 hover:bg-slate-800 text-white' },
+  };
+
+  // ─── SIDEBAR ───────────────────────────────────────────────────────────────
+
+  const NAVICONS = {
+    dashboard:    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" strokeWidth="2"/></svg>,
+    portfolio:    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>,
+    posteingang:  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>,
+    finanzen:     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+    'ki-center':  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>,
+    einstellungen:<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3" strokeWidth="2"/></svg>,
+  };
+
+  const NAV = [
+    { id: 'dashboard',    label: 'Dashboard',    badge: 4 },
+    { id: 'portfolio',    label: 'Portfolio' },
+    { id: 'posteingang',  label: 'Posteingang',  badge: 4 },
+    { id: 'finanzen',     label: 'Finanzen' },
+    { id: 'ki-center',    label: 'KI-Center' },
+    { id: 'einstellungen',label: 'Einstellungen' },
+  ];
+
+  function Sidebar({ view, setView }) {
+    return (
+      <aside className="w-56 bg-slate-900 flex flex-col h-full shrink-0">
+        <div className="px-5 py-5 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shrink-0"><span className="text-white text-xs font-bold">A</span></div>
+            <span className="text-white font-semibold text-sm">Authaver</span>
+            <span className="ml-auto text-xs text-slate-600 font-mono">v3</span>
+          </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5">
+          {NAV.map(item => (
+            <button key={item.id} onClick={() => setView(item.id)}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${view === item.id ? 'bg-blue-600 text-white' : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'}`}>
+              <span className="shrink-0">{NAVICONS[item.id]}</span>
+              <span className="flex-1 text-left font-medium">{item.label}</span>
+              {item.badge && <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${view === item.id ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-300'}`}>{item.badge}</span>}
+            </button>
+          ))}
+        </nav>
+        <div className="px-4 py-4 border-t border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shrink-0"><span className="text-xs text-white font-semibold">RZ</span></div>
+            <div><p className="text-xs font-medium text-slate-300">Reyk Zepper</p><p className="text-xs text-slate-500">Haupteigentümer</p></div>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
+  // ─── DASHBOARD ─────────────────────────────────────────────────────────────
+
+  function Dashboard({ setView }) {
+    const [dismissed, setDismissed] = useState([]);
+    const tasks = TASKS.filter(t => !dismissed.includes(t.id));
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+          <div className="mb-7"><h1 className="text-2xl font-bold text-slate-900">Guten Morgen, Reyk.</h1><p className="text-slate-500 mt-1 text-sm">Heute {tasks.length} Vorgänge die deine Aufmerksamkeit brauchen.</p></div>
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-5 mb-7 flex gap-4">
+            <div className="w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center text-white text-sm shrink-0 mt-0.5">✦</div>
+            <div><p className="text-white text-sm font-semibold">KI-Zusammenfassung · Heute 07:15</p><p className="text-blue-100 text-sm mt-1 leading-relaxed">Paula hat 4 neue Mails klassifiziert — 1 dringende Reparatur (Heizung Whg 3), 1 Rechnung zur Freigabe. Zara meldet Mietrückstand Müller, April noch offen. Max hat Mahnung Stufe 1 vorbereitet. Aufzugswartung Bergweg 12 ist seit 7 Tagen überfällig.</p></div>
+          </div>
+          <div className="mb-7">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Offene Aufgaben</h2>
+            {tasks.length === 0 ? <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center"><p className="text-2xl mb-2">✓</p><p className="text-slate-500 text-sm">Alles erledigt.</p></div> : (
+              <div className="grid grid-cols-2 gap-4">
+                {tasks.map(t => { const c = TC[t.color]; return (
+                  <div key={t.id} className={`rounded-2xl border ${c.border} ${c.bg} p-5`}>
+                    <div className="flex items-start gap-3">
+                      <div className={`w-9 h-9 rounded-xl ${c.icon} flex items-center justify-center text-base font-bold shrink-0`}>{t.icon}</div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">{t.title}</p>
+                        <p className="text-xs text-slate-600 mt-1 leading-relaxed">{t.desc}</p>
+                        {t.agent && <p className="text-xs text-blue-600 mt-1.5">✦ {t.agent}</p>}
+                        <p className="text-xs text-slate-400 mt-0.5">🏠 {t.sub}</p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      {t.btns.map((btn, i) => <button key={btn} onClick={() => { if(i===0) setDismissed(d=>[...d,t.id]); }} className={`text-xs px-3 py-2 rounded-lg font-semibold transition-colors ${i===0 ? c.btn : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'}`}>{btn}</button>)}
+                    </div>
+                  </div>
+                );})}
+              </div>
+            )}
+          </div>
+          <div>
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Portfolio</h2>
+            <div className="grid grid-cols-3 gap-4">
+              {PROPERTIES.map(p => (
+                <button key={p.id} onClick={() => setView('liegenschaft')} className="text-left bg-white border border-slate-200 rounded-2xl p-4 hover:border-blue-300 hover:shadow-sm transition-all group">
+                  <div className="flex items-start justify-between mb-3">
+                    <div><p className="text-sm font-semibold text-slate-900 group-hover:text-blue-600 transition-colors">{p.name}</p><p className="text-xs text-slate-400 mt-0.5">{p.city}</p></div>
+                    <span className={`text-xs px-2 py-0.5 rounded-full font-medium shrink-0 ${BC[p.type==='WEG'?'purple':'slate']}`}>{p.type}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs text-slate-400">{p.units} Einh. · {p.occupied} belegt</span>
+                    {p.alerts > 0 ? <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${BC.amber}`}>⚠ {p.alerts}</span> : <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${BC.green}`}>✓ OK</span>}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── POSTEINGANG ───────────────────────────────────────────────────────────
+
+  function Posteingang({ setView }) {
+    const [sel, setSel] = useState('e1');
+    const mail = EMAILS.find(e => e.id === sel);
+    return (
+      <div className="h-full flex overflow-hidden">
+        <div className="w-64 border-r border-slate-200 bg-white flex flex-col shrink-0">
+          <div className="px-4 py-4 border-b border-slate-100"><p className="text-sm font-semibold text-slate-900">Posteingang</p><p className="text-xs text-slate-400 mt-0.5">4 neue · Paula aktiv</p></div>
+          <div className="flex-1 overflow-y-auto">
+            {EMAILS.map(e => (
+              <button key={e.id} onClick={() => setSel(e.id)} className={`w-full text-left px-4 py-3.5 border-b border-slate-100 transition-all ${sel===e.id ? 'bg-blue-50 border-l-2 border-l-blue-500' : 'hover:bg-slate-50 border-l-2 border-l-transparent'}`}>
+                <div className="flex items-center justify-between gap-2 mb-1"><p className={`text-xs font-semibold truncate ${e.urgent?'text-red-600':'text-slate-800'}`}>{e.from}</p><span className={`text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0 ${BC[e.badgeColor]}`}>{e.badge}</span></div>
+                <p className="text-xs text-slate-600 truncate">{e.subject}</p>
+                <p className="text-xs text-slate-400 mt-1">{e.time}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+        {mail && <>
+          <div className="flex-1 overflow-y-auto bg-white border-r border-slate-200">
+            <div className="px-7 py-5 border-b border-slate-100 sticky top-0 bg-white z-10"><h3 className="text-sm font-semibold text-slate-900">{mail.subject}</h3><p className="text-xs text-slate-400 mt-1">Von: <span className="text-slate-600">{mail.from}</span> · {mail.time}</p></div>
+            <div className="px-7 py-6"><p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{mail.preview}</p>
+              <div className="mt-6 pt-6 border-t border-slate-100 flex gap-2"><button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium">Antworten</button><button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-lg font-medium">Weiterleiten</button></div>
+            </div>
+          </div>
+          <div className="w-72 bg-slate-50 overflow-y-auto shrink-0 flex flex-col">
+            <div className="px-5 py-4 border-b border-slate-200 bg-white flex items-center gap-3">
+              <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center text-white text-xs font-bold">✦</div>
+              <div><p className="text-xs font-semibold text-slate-900">Paula · Vorschlag</p><p className="text-xs text-slate-400">Confidence {mail.confidence}%</p></div>
+            </div>
+            <div className="flex-1 px-5 py-4 space-y-4">
+              <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5">
+                <Row label="Typ" val={<span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BC[mail.badgeColor]}`}>{mail.badge}</span>} />
+                {mail.property && <Row label="Liegenschaft" val={mail.property} />}
+                {mail.unit && <Row label="Einheit" val={mail.unit} />}
+                <Row label="Dringlichkeit" val={<span className={`text-xs font-medium ${mail.dringlichkeit==='Hoch'?'text-red-600':mail.dringlichkeit==='Niedrig'?'text-slate-400':'text-slate-700'}`}>{mail.dringlichkeit}</span>} />
+                {mail.kostenart && <Row label="Kostenart" val={mail.kostenart} />}
+              </div>
+              <div><div className="flex justify-between text-xs text-slate-400 mb-1.5"><span>Confidence</span><span className={mail.confidence>=90?'text-green-600 font-medium':mail.confidence>=70?'text-amber-600 font-medium':'text-red-600 font-medium'}>{mail.confidence}%</span></div><div className="h-1.5 bg-slate-200 rounded-full overflow-hidden"><div className={`h-full rounded-full ${mail.confidence>=90?'bg-green-500':mail.confidence>=70?'bg-amber-500':'bg-red-500'}`} style={{width:`${mail.confidence}%`}}/></div></div>
+              <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5"><p className="text-xs font-semibold text-blue-800 mb-1.5">Begründung</p><p className="text-xs text-blue-700 leading-relaxed">{mail.reason}</p></div>
+              <div className="space-y-2">
+                <button onClick={() => setView('vorgang-detail')} className="w-full bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold py-2.5 rounded-xl transition-colors">Vorgang anlegen →</button>
+                <button className="w-full bg-white hover:bg-slate-100 text-slate-700 text-xs font-medium py-2 rounded-xl border border-slate-200">Klassifikation korrigieren</button>
+                <button className="w-full text-slate-400 hover:text-slate-600 text-xs py-1.5 text-center">Ignorieren / Archivieren</button>
+              </div>
+            </div>
+          </div>
+        </>}
+      </div>
+    );
+  }
+
+  function Row({ label, val }) {
+    return <div className="flex items-center justify-between gap-3"><span className="text-xs text-slate-400 shrink-0">{label}</span><span className="text-xs font-medium text-slate-800 text-right">{val}</span></div>;
+  }
+
+  // ─── VORGANG DETAIL ────────────────────────────────────────────────────────
+
+  function VorgangDetail({ setView }) {
+    const [tab, setTab] = useState('Verlauf');
+    const TABS = ['Verlauf', 'Finanzen', 'Dokumente', 'KI-Protokoll'];
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-4xl mx-auto px-8 py-8">
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-6">
+            <button onClick={() => setView('liegenschaft')} className="hover:text-blue-600">Vorgänge</button><span>›</span><span className="text-slate-600 font-medium">Vorgang #V-2026-0341</span>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 bg-red-100 rounded-2xl flex items-center justify-center text-xl shrink-0">🔧</div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5"><span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">Reparatur</span><span className="text-xs text-slate-400 font-mono">#V-2026-0341</span><span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">✦ Von Paula erstellt</span></div>
+                  <h1 className="text-xl font-bold text-slate-900">Heizung defekt</h1>
+                  <div className="flex flex-wrap items-center gap-3 mt-2"><span className="text-xs text-slate-500">🏠 Musterstr. 4</span><span className="text-xs text-slate-300">·</span><span className="text-xs text-slate-500">📍 Whg 3</span><span className="text-xs text-slate-300">·</span><span className="text-xs text-slate-500">📂 Heizung/Sanitär</span><span className="text-xs text-slate-300">·</span><span className="text-xs text-slate-500">📅 Apr 2026</span></div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0"><span className={`text-xs font-bold px-3 py-1.5 rounded-full ${BC.amber}`}>● Offen</span><button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl">Freigeben</button></div>
+            </div>
+            <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-4 gap-4">
+              {[{l:'Verantwortlich',v:'Reyk Zepper'},{l:'Erstellt von',v:'Paula (KI)'},{l:'Erstellt',v:'07.04.2026 08:14'},{l:'Dringlichkeit',v:'🔴 Hoch'}].map(f=><div key={f.l}><p className="text-xs text-slate-400">{f.l}</p><p className="text-sm font-semibold text-slate-900 mt-0.5">{f.v}</p></div>)}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-4">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Reparatur-Details</p>
+            <div className="grid grid-cols-3 gap-4 mb-5">
+              {[{l:'Gewerk',v:'Heizung / Sanitär',e:false},{l:'Dienstleister',v:'Noch nicht beauftragt',e:true},{l:'Termin',v:'Noch nicht gesetzt',e:true}].map(f=>(
+                <div key={f.l} className={`p-4 rounded-xl border ${f.e?'border-dashed border-slate-200 bg-slate-50':'border-slate-200'}`}>
+                  <p className="text-xs text-slate-400">{f.l}</p><p className={`text-sm font-medium mt-1 ${f.e?'text-slate-300':'text-slate-900'}`}>{f.v}</p>
+                  <button className="text-xs text-blue-600 mt-1.5 hover:underline">Bearbeiten</button>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="flex border-b border-slate-100">
+              {TABS.map(t=><button key={t} onClick={()=>setTab(t)} className={`px-5 py-3.5 text-xs font-semibold transition-colors ${tab===t?'text-blue-600 border-b-2 border-blue-600':'text-slate-400 hover:text-slate-600'}`}>{t}</button>)}
+            </div>
+            <div className="p-6">
+              {tab==='Verlauf' && (
+                <div className="space-y-5">
+                  {VERLAUF.map((item,i)=>(
+                    <div key={i} className="flex gap-3">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                        item.type==='ki'?'bg-blue-100 text-blue-600':
+                        item.type==='mail'?'bg-slate-100 text-slate-500':'bg-slate-100 text-slate-600'}`}>{item.avatar}</div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-0.5">
+                          <span className="text-xs font-semibold text-slate-900">{item.actor}</span>
+                          <span className="text-xs text-slate-400">{item.time}</span>
+                          {item.type==='ki' && <span className={`text-xs px-1.5 py-0.5 rounded-full ${BC.blue}`}>KI</span>}
+                          {item.type==='mail' && <span className={`text-xs px-1.5 py-0.5 rounded-full ${BC.slate}`}>Mail</span>}
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed">{item.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-1"><input type="text" placeholder="Notiz oder Nachricht hinzufügen..." className="w-full text-xs px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-400 bg-slate-50"/></div>
+                </div>
+              )}
+              {tab==='KI-Protokoll' && (
+                <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                  <div className="flex items-center gap-2 mb-2"><span className="text-xs font-bold text-blue-900">Paula · 07.04.2026 08:14</span><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BC.green}`}>Confidence 94%</span></div>
+                  <p className="text-xs text-blue-800 leading-relaxed">Typ erkannt: Reparatur. Absender Thomas Müller ist als Mieter Whg 3, Musterstr. 4 bekannt. Schlüsselwörter: "Heizung", "defekt", "kein warmes Wasser". Dringlichkeit Hoch gesetzt. Vorgang #V-2026-0341 erstellt.</p>
+                  <div className="flex items-center gap-4 mt-3 pt-3 border-t border-blue-200"><span className="text-xs text-blue-600 font-medium">Token: 320</span><span className="text-xs text-blue-600 font-medium">Aktion: Vorgang erstellt</span></div>
+                </div>
+              )}
+              {!['Verlauf','KI-Protokoll'].includes(tab) && <p className="text-slate-300 text-sm text-center py-8">— Noch keine Einträge —</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── LIEGENSCHAFT COCKPIT ──────────────────────────────────────────────────
+
+  function LiegenschaftCockpit({ setView }) {
+    const [subNav, setSubNav] = useState('Übersicht');
+    const SUB = ['Übersicht','Vorgänge','Abrechnung','Mieter','Finanzen','WEG','Dokumente'];
+    const p = PROPERTIES[0];
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        <div className="bg-white border-b border-slate-200 px-8 pt-6 shrink-0">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2"><button onClick={()=>setView('portfolio')} className="hover:text-blue-600">Portfolio</button><span>›</span><span className="text-slate-600 font-medium">{p.name}</span></div>
+              <h1 className="text-xl font-bold text-slate-900">{p.name}</h1>
+              <p className="text-sm text-slate-400 mt-0.5">{p.city} · 4 Einheiten · Mietverwaltung</p>
+            </div>
+            <div className="flex items-center gap-2"><span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${BC.amber}`}>⚠ 2 offene Vorgänge</span><button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium">Bearbeiten</button></div>
+          </div>
+          <div className="flex overflow-x-auto">
+            {SUB.map(item=><button key={item} onClick={()=>setSubNav(item)} className={`px-4 py-2.5 text-sm font-semibold transition-colors border-b-2 whitespace-nowrap ${subNav===item?'text-blue-600 border-blue-600':'text-slate-400 border-transparent hover:text-slate-700'}`}>{item}</button>)}
+          </div>
+        </div>
+        <div className="flex-1 overflow-y-auto bg-slate-50">
+          {subNav==='Übersicht' && <UebersichtTab setView={setView} setSubNav={setSubNav} />}
+          {subNav==='Vorgänge' && <VorgaengeTab setView={setView} />}
+          {subNav==='Abrechnung' && <AbrechnungTab />}
+          {subNav==='Finanzen' && <FinanzenTab />}
+          {subNav==='WEG' && <WEGTab />}
+          {!['Übersicht','Vorgänge','Abrechnung','Finanzen','WEG'].includes(subNav) && <div className="flex items-center justify-center h-64"><p className="text-slate-300">— {subNav} in Planung —</p></div>}
+        </div>
+      </div>
+    );
+  }
+
+  // ─── ÜBERSICHT TAB ─────────────────────────────────────────────────────────
+
+  function UebersichtTab({ setView, setSubNav }) {
+    const units = [{l:'Whg 1',t:'Schmidt, K.',s:'bezahlt',r:950},{l:'Whg 2',t:'Yilmaz, S.',s:'bezahlt',r:1100},{l:'Whg 3',t:'Müller, T.',s:'rückstand',r:1150,a:2},{l:'Whg 4',t:'—',s:'leer',r:null}];
+    return (
+      <div className="max-w-5xl mx-auto px-8 py-6">
+        <div className="grid grid-cols-4 gap-4 mb-6">
+          {[{l:'Mietsoll / Monat',v:'€4.200',s:'3 von 4 bezahlt',c:'text-slate-900'},{l:'Rückstände',v:'€950',s:'Müller, Whg 3',c:'text-red-600'},{l:'Offene Vorgänge',v:'2',s:'1 Reparatur, 1 Rechnung',c:'text-amber-600'},{l:'NK 2025',v:'3 fehlen',s:'Diana angefragt',c:'text-blue-600'}].map(s=>(
+            <div key={s.l} className="bg-white rounded-2xl border border-slate-200 p-4"><p className="text-xs text-slate-400">{s.l}</p><p className={`text-2xl font-bold mt-1 ${s.c}`}>{s.v}</p><p className="text-xs text-slate-400 mt-0.5">{s.s}</p></div>
+          ))}
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
+          <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between"><h3 className="text-sm font-semibold text-slate-900">Einheiten</h3><button className="text-xs text-blue-600 hover:underline font-medium">+ Einheit</button></div>
+          {units.map((u,i)=>(
+            <div key={i} className={`px-5 py-4 flex items-center gap-4 ${i<units.length-1?'border-b border-slate-100':''}`}>
+              <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center shrink-0"><span className="text-xs font-bold text-slate-600">{u.l.replace('Whg ','')}</span></div>
+              <div className="flex-1"><p className="text-sm font-semibold text-slate-900">{u.l}</p><p className="text-xs text-slate-400">{u.t}</p></div>
+              <div className="text-right">
+                {u.r && <p className="text-sm font-bold text-slate-900">€{u.r}</p>}
+                <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${u.s==='bezahlt'?BC.green:u.s==='rückstand'?BC.red:BC.slate}`}>{u.s==='bezahlt'?'✓ Bezahlt':u.s==='rückstand'?'⚠ Rückstand':'Leer'}</span>
+              </div>
+              {u.a && <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BC.amber}`}>{u.a} offen</span>}
+            </div>
+          ))}
+        </div>
+        <div className="bg-white rounded-2xl border border-slate-200 p-5">
+          <h3 className="text-sm font-semibold text-slate-900 mb-4">KI-Aktivität · letzte 24h</h3>
+          <div className="space-y-3">
+            {[{a:'Paula',t:'2 Mails klassifiziert — Reparatur (Heizung) + Anfrage NK',z:'vor 4 Min'},{a:'Rex',t:'Rechnung #2026-0089 geprüft, €480, Freigabe angefordert',z:'gestern'},{a:'Zara',t:'Mietrückstand Müller erkannt, Max benachrichtigt',z:'06:00'},{a:'Max',t:'Mahnung Stufe 1 für Müller vorbereitet',z:'07:02'}].map((a,i)=>(
+              <div key={i} className="flex items-center gap-3"><span className="text-xs font-bold text-blue-600 w-12 shrink-0">{a.a}</span><span className="text-xs text-slate-600 flex-1">{a.t}</span><span className="text-xs text-slate-400 shrink-0">{a.z}</span></div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── VORGÄNGE TAB ──────────────────────────────────────────────────────────
+
+  function VorgaengeTab({ setView }) {
+    const [activeType, setActiveType] = useState('Alle');
+    const TYPES = ['Alle','Reparaturen','Wartungen','Maßnahmen'];
+    const statusColor = s => s==='Offen'?BC.amber:s==='In Arbeit'?BC.blue:s==='Abgeschlossen'?BC.green:s==='Überfällig'?BC.red:s==='Fällig'?BC.orange:BC.slate;
+
+    return (
+      <div className="max-w-5xl mx-auto px-8 py-6">
+        <div className="flex items-center justify-between mb-5">
+          <div className="flex gap-1 bg-white border border-slate-200 rounded-xl p-1">
+            {TYPES.map(t=><button key={t} onClick={()=>setActiveType(t)} className={`px-4 py-1.5 text-xs font-semibold rounded-lg transition-all ${activeType===t?'bg-blue-600 text-white':'text-slate-500 hover:text-slate-700'}`}>{t}</button>)}
+          </div>
+          <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl">+ Vorgang</button>
+        </div>
+
+        {(activeType==='Alle'||activeType==='Reparaturen') && (
+          <div className="mb-6">
+            {activeType==='Alle' && <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Reparaturen</p>}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="grid grid-cols-12 gap-3 px-5 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                <span className="col-span-1">Nr.</span><span className="col-span-3">Titel</span><span className="col-span-2">Einheit</span><span className="col-span-2">Gewerk</span><span className="col-span-2">Dringlichkeit</span><span className="col-span-1">Status</span><span className="col-span-1">Erstellt</span>
+              </div>
+              {REPARATUREN.map((r,i)=>(
+                <button key={r.id} onClick={()=>setView('vorgang-detail')} className={`w-full text-left grid grid-cols-12 gap-3 px-5 py-3.5 hover:bg-slate-50 transition-colors items-center ${i<REPARATUREN.length-1?'border-b border-slate-100':''}`}>
+                  <span className="col-span-1 text-xs font-mono text-slate-400">{r.nr.replace('#V-2026-','')}</span>
+                  <div className="col-span-3 flex items-center gap-2"><span className="text-xs font-semibold text-slate-900">{r.title}</span>{r.aiErstellt && <span className="text-xs text-blue-500">✦</span>}</div>
+                  <span className="col-span-2 text-xs text-slate-600">{r.einheit}</span>
+                  <span className="col-span-2 text-xs text-slate-600">{r.gewerk}</span>
+                  <span className="col-span-2"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${r.dringlichkeit==='Hoch'?BC.red:r.dringlichkeit==='Normal'?BC.slate:BC.green}`}>{r.dringlichkeit}</span></span>
+                  <span className="col-span-1"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor(r.status)}`}>{r.status}</span></span>
+                  <span className="col-span-1 text-xs text-slate-400">{r.erstellt}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(activeType==='Alle'||activeType==='Wartungen') && (
+          <div className="mb-6">
+            {activeType==='Alle' && <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Wartungen</p>}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="grid grid-cols-12 gap-3 px-5 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                <span className="col-span-3">Anlage</span><span className="col-span-2">Typ</span><span className="col-span-2">Intervall</span><span className="col-span-2">Letzter Termin</span><span className="col-span-2">Nächster Termin</span><span className="col-span-1">Status</span>
+              </div>
+              {WARTUNGEN.map((w,i)=>(
+                <div key={w.id} className={`grid grid-cols-12 gap-3 px-5 py-3.5 items-center ${i<WARTUNGEN.length-1?'border-b border-slate-100':''}`}>
+                  <span className="col-span-3 text-xs font-semibold text-slate-900">{w.anlage}</span>
+                  <span className="col-span-2 text-xs text-slate-600">{w.typ}</span>
+                  <span className="col-span-2 text-xs text-slate-600">{w.intervall}</span>
+                  <span className="col-span-2 text-xs text-slate-500">{w.letzter}</span>
+                  <span className={`col-span-2 text-xs font-medium ${w.status==='Überfällig'?'text-red-600':w.status==='Fällig'?'text-amber-600':'text-slate-600'}`}>{w.naechster}</span>
+                  <span className="col-span-1"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${statusColor(w.status)}`}>{w.status}</span></span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {(activeType==='Alle'||activeType==='Maßnahmen') && (
+          <div>
+            {activeType==='Alle' && <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Maßnahmen</p>}
+            <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+              <div className="grid grid-cols-12 gap-3 px-5 py-3 border-b border-slate-100 text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                <span className="col-span-3">Maßnahme</span><span className="col-span-2">Typ</span><span className="col-span-2">Budget</span><span className="col-span-2">Ist-Kosten</span><span className="col-span-2">Beschluss</span><span className="col-span-1">Status</span>
+              </div>
+              {MASSNAHMEN.map((m,i)=>(
+                <div key={m.id} className={`grid grid-cols-12 gap-3 px-5 py-3.5 items-center ${i<MASSNAHMEN.length-1?'border-b border-slate-100':''}`}>
+                  <span className="col-span-3 text-xs font-semibold text-slate-900">{m.titel}</span>
+                  <span className="col-span-2 text-xs text-slate-600">{m.typ}</span>
+                  <span className="col-span-2 text-xs font-medium text-slate-900">€{m.budget.toLocaleString('de')}</span>
+                  <div className="col-span-2">
+                    <span className="text-xs font-medium text-slate-900">€{m.ist.toLocaleString('de')}</span>
+                    <div className="mt-1 h-1 bg-slate-100 rounded-full w-16"><div className="h-full bg-blue-500 rounded-full" style={{width:`${Math.min(100,m.ist/m.budget*100)}%`}}/></div>
+                  </div>
+                  <span className="col-span-2 text-xs text-slate-500">{m.beschluss}</span>
+                  <span className="col-span-1"><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${m.status==='In Planung'?BC.blue:BC.green}`}>{m.status}</span></span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── ABRECHNUNG TAB ────────────────────────────────────────────────────────
+
+  function AbrechnungTab() {
+    const [activeStep, setActiveStep] = useState(3);
+    const activeStepData = NK_STEPS.find(s => s.id === activeStep);
+
+    return (
+      <div className="max-w-5xl mx-auto px-8 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div><h2 className="text-base font-bold text-slate-900">Nebenkostenabrechnung 2025</h2><p className="text-xs text-slate-400 mt-0.5">01.01.2025 – 31.12.2025 · Musterstraße 4</p></div>
+          <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${BC.amber}`}>● Schritt 3 von 8</span>
+        </div>
+
+        {/* Process Steps */}
+        <div className="bg-white rounded-2xl border border-slate-200 p-5 mb-6">
+          <div className="flex items-center gap-1">
+            {NK_STEPS.map((step, i) => (
+              <React.Fragment key={step.id}>
+                <button onClick={() => setActiveStep(step.id)} className={`flex-1 flex flex-col items-center gap-1.5 py-2.5 px-1 rounded-xl transition-all ${activeStep===step.id?'bg-blue-50 border border-blue-200':''}`}>
+                  <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold ${
+                    step.status==='done'?'bg-green-500 text-white':
+                    step.status==='active'?'bg-blue-600 text-white':
+                    'bg-slate-200 text-slate-400'}`}>
+                    {step.status==='done'?'✓':step.id}
+                  </div>
+                  <p className={`text-xs font-medium text-center leading-tight ${step.status==='done'?'text-green-700':step.status==='active'?'text-blue-700':'text-slate-400'}`}>{step.label}</p>
+                  {step.info && <p className={`text-xs text-center ${step.status==='active'?'text-blue-500':step.status==='done'?'text-green-600':'text-slate-300'}`}>{step.info}</p>}
+                </button>
+                {i < NK_STEPS.length-1 && <div className={`w-4 h-0.5 shrink-0 ${i < NK_STEPS.findIndex(s=>s.status==='active')?'bg-green-300':'bg-slate-200'}`}/>}
+              </React.Fragment>
+            ))}
+          </div>
+        </div>
+
+        {/* Active Step Content */}
+        {activeStep === 2 && (
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <h3 className="text-sm font-semibold text-slate-900">Kostenarten · 2025</h3>
+              <button className="text-xs text-blue-600 font-medium hover:underline">+ Kostenart</button>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {KOSTENARTEN.map(k => (
+                <div key={k.id} className="px-5 py-3.5 flex items-center gap-4">
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium text-slate-900">{k.name}</p><p className="text-xs text-slate-400 mt-0.5">{k.schluessel ? `Schlüssel: ${k.schluessel}` : 'Kein Schlüssel'}</p></div>
+                  <span className="text-sm font-bold text-slate-900">€{k.betrag.toLocaleString('de')}</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${k.umlagefaehig ? BC.green : BC.slate}`}>{k.umlagefaehig ? 'Umlagefähig' : 'Nicht umlagefähig'}</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${k.belegStatus==='vollständig'?BC.green:k.belegStatus==='fehlt'?BC.red:BC.slate}`}>{k.belege} {k.belege===1?'Beleg':'Belege'}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {activeStep === 3 && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-6">
+            <h3 className="text-sm font-semibold text-slate-900 mb-1">Verteilerschlüssel konfigurieren</h3>
+            <p className="text-xs text-slate-400 mb-5">3 Kostenarten haben noch keinen vollständig konfigurierten Schlüssel.</p>
+            <div className="space-y-3">
+              {[{name:'Hausmeisterservice',schluessel:'Wohnfläche',problem:'Wohnflächen fehlen für Whg 4'},{name:'Straßenreinigung',schluessel:'Einheiten',problem:'Leerstandslogik nicht konfiguriert'},{name:'Heizkosten',schluessel:'Verbrauch',problem:'Verbrauchsdaten aus Schritt 4 ausstehend'}].map(k=>(
+                <div key={k.name} className="flex items-center gap-4 p-4 rounded-xl border border-amber-200 bg-amber-50">
+                  <div className="flex-1"><p className="text-sm font-semibold text-slate-900">{k.name}</p><p className="text-xs text-amber-700 mt-0.5">⚠ {k.problem}</p></div>
+                  <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${BC.slate}`}>{k.schluessel}</span>
+                  <button className="text-xs bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-lg hover:bg-slate-50 font-medium">Konfigurieren</button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {![2,3].includes(activeStep) && (
+          <div className="bg-white rounded-2xl border border-slate-200 p-12 text-center">
+            <p className="text-slate-300 text-sm">— Schritt {activeStep}: {activeStepData?.label} —</p>
+            {activeStepData?.status === 'done' && <p className="text-green-500 text-xs mt-2">✓ Abgeschlossen</p>}
+            {activeStepData?.status === 'pending' && <p className="text-slate-400 text-xs mt-2">Noch nicht begonnen</p>}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ─── FINANZEN TAB ──────────────────────────────────────────────────────────
+
+  function FinanzenTab() {
+    const [selBank, setSelBank] = useState('b3');
+    const [matched, setMatched] = useState(['b1','b2']);
+    const bew = BANK_BEWEGUNGEN.find(b => b.id === selBank);
+
+    const statusBadge = s => s==='zugeordnet'?BC.green:s==='vorschlag'?BC.blue:s==='unklar'?BC.red:BC.slate;
+
+    return (
+      <div className="max-w-5xl mx-auto px-8 py-6">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-base font-bold text-slate-900">Zahlungsabgleich</h2>
+          <div className="flex gap-2">
+            <button className="text-xs bg-white border border-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium">MT940 / CSV importieren</button>
+            <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-xl font-bold">Alle Vorschläge annehmen</button>
+          </div>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+
+          {/* Left: Bank Movements */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="text-sm font-semibold text-slate-900">Bankbewegungen</p>
+              <p className="text-xs text-slate-400 mt-0.5">Mietkonto · Apr 2026 · 4 Umsätze</p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {BANK_BEWEGUNGEN.map(b => (
+                <button key={b.id} onClick={() => setSelBank(b.id)} className={`w-full text-left px-5 py-4 hover:bg-slate-50 transition-all ${selBank===b.id?'bg-blue-50 border-l-2 border-l-blue-500':''}`}>
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-semibold text-slate-900 truncate">{b.von}</p>
+                      <p className="text-xs text-slate-500 truncate mt-0.5">{b.verwendung}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{b.datum}</p>
+                    </div>
+                    <div className="text-right shrink-0">
+                      <p className="text-sm font-bold text-green-600">+€{b.betrag}</p>
+                      <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full mt-1 inline-block ${statusBadge(b.status)}`}>
+                        {b.status==='zugeordnet'?'✓':b.status==='vorschlag'?`✦ ${b.kiConf}%`:'?'}
+                      </span>
+                    </div>
+                  </div>
+                  {b.status==='vorschlag' && <div className="mt-2 text-xs text-blue-600 bg-blue-50 rounded-lg px-2.5 py-1.5">✦ KI: {b.kiVorschlag}</div>}
+                  {b.zuordnung && <div className="mt-2 text-xs text-green-700 bg-green-50 rounded-lg px-2.5 py-1.5">→ {b.zuordnung}</div>}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Right: Open Items */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100">
+              <p className="text-sm font-semibold text-slate-900">Offene Posten</p>
+              <p className="text-xs text-slate-400 mt-0.5">{OFFENE_POSTEN.filter(op=>op.status!=='bezahlt').length} offen · Apr 2026</p>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {OFFENE_POSTEN.map(op => {
+                const highlight = bew && bew.kiVorschlag && bew.kiVorschlag.includes(op.desc.split(' ')[2]?.replace(',',''));
+                return (
+                  <div key={op.id} className={`px-5 py-4 transition-all ${highlight?'bg-blue-50 border-l-2 border-l-blue-400':''}`}>
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-0.5"><span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${BC.slate}`}>{op.typ}</span></div>
+                        <p className="text-xs font-medium text-slate-900">{op.desc}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">Fällig: {op.faellig}</p>
+                      </div>
+                      <div className="text-right shrink-0">
+                        <p className="text-sm font-bold text-slate-900">€{op.betrag}</p>
+                        <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full mt-1 inline-block ${op.status==='bezahlt'?BC.green:op.status==='rückstand'?BC.red:op.status==='freigegeben'?BC.blue:BC.slate}`}>
+                          {op.status==='bezahlt'?'✓ Bezahlt':op.status==='rückstand'?'⚠ Rückstand':op.status==='freigegeben'?'Freigegeben':'Offen'}
+                        </span>
+                      </div>
+                    </div>
+                    {highlight && (
+                      <div className="mt-2 flex gap-2">
+                        <button className="text-xs bg-blue-600 text-white px-3 py-1.5 rounded-lg font-semibold">Zuordnung bestätigen</button>
+                        <button className="text-xs bg-white border border-slate-200 text-slate-600 px-2 py-1.5 rounded-lg">Ablehnen</button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="px-5 py-3 bg-slate-50 border-t border-slate-100">
+              <div className="flex justify-between text-xs"><span className="text-slate-500">Gesamt offen</span><span className="font-bold text-slate-900">€{OFFENE_POSTEN.filter(op=>op.status!=='bezahlt').reduce((s,op)=>s+op.betrag,0).toLocaleString('de')}</span></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── WEG TAB ───────────────────────────────────────────────────────────────
+
+  function WEGTab() {
+    return (
+      <div className="max-w-5xl mx-auto px-8 py-6">
+        <div className="flex items-center justify-between mb-6">
+          <div><h2 className="text-base font-bold text-slate-900">WEG · Parkstraße 7</h2><p className="text-xs text-slate-400 mt-0.5">4 Eigentümer · 12 Einheiten · Wirtschaftsjahr 2026</p></div>
+        </div>
+
+        {/* Laufend */}
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Laufend</p>
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs text-slate-400 mb-3">Hausgeld Soll/Ist · Apr 2026</p>
+            <div className="space-y-2">
+              {[{name:'Müller, A.',anteil:'25 MEA',soll:700,ist:700,s:'bezahlt'},{name:'Schmidt, B.',anteil:'25 MEA',soll:700,ist:700,s:'bezahlt'},{name:'Weber, C.',anteil:'30 MEA',soll:840,ist:0,s:'rückstand'},{name:'Bauer, D.',anteil:'20 MEA',soll:560,ist:560,s:'bezahlt'}].map(e=>(
+                <div key={e.name} className="flex items-center justify-between">
+                  <div><p className="text-xs font-medium text-slate-900">{e.name}</p><p className="text-xs text-slate-400">{e.anteil}</p></div>
+                  <div className="text-right"><p className="text-xs font-bold text-slate-900">€{e.soll}</p><span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full ${e.s==='bezahlt'?BC.green:BC.red}`}>{e.s==='bezahlt'?'✓':'⚠'}</span></div>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs text-slate-400 mb-3">Rücklagen</p>
+            <p className="text-3xl font-bold text-slate-900 mb-1">€48.200</p>
+            <p className="text-xs text-slate-400 mb-4">Instandhaltungsrücklage</p>
+            <div className="space-y-2 text-xs">
+              <div className="flex justify-between"><span className="text-slate-500">Zuführung 2026</span><span className="font-semibold text-green-600">+€8.400</span></div>
+              <div className="flex justify-between"><span className="text-slate-500">Entnahme Dachsanierung</span><span className="font-semibold text-red-600">−€12.400</span></div>
+              <div className="flex justify-between pt-2 border-t border-slate-100"><span className="font-semibold text-slate-700">Aktuell</span><span className="font-bold text-slate-900">€48.200</span></div>
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <p className="text-xs text-slate-400 mb-3">Offene Posten</p>
+            <div className="space-y-3">
+              <div className="p-3 rounded-xl bg-red-50 border border-red-200"><p className="text-xs font-semibold text-red-800">Weber, C. — Hausgeld Apr</p><p className="text-xs text-red-600 mt-0.5">€840 · 8 Tage überfällig</p><button className="text-xs text-red-600 mt-1.5 font-semibold hover:underline">Mahnung senden →</button></div>
+              <div className="p-3 rounded-xl bg-slate-50 border border-slate-200"><p className="text-xs font-semibold text-slate-700">Sonderumlage Dach</p><p className="text-xs text-slate-500 mt-0.5">3 von 4 Eigentümern bezahlt</p></div>
+            </div>
+          </div>
+        </div>
+
+        {/* Jährlich */}
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Jahresprozesse</p>
+        <div className="grid grid-cols-3 gap-4">
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <div className="flex items-start justify-between mb-3"><div><p className="text-sm font-semibold text-slate-900">Wirtschaftsplan 2026</p><p className="text-xs text-slate-400 mt-0.5">Genehmigt · ETV 12/2025</p></div><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BC.green}`}>Aktiv</span></div>
+            <div className="space-y-1.5 text-xs">
+              {[{l:'Laufende Kosten',v:'€28.400'},{l:'Instandhaltung',v:'€8.400'},{l:'Rücklage',v:'€4.200'},{l:'Gesamt/Jahr',v:'€41.000',bold:true}].map(r=><div key={r.l} className={`flex justify-between ${r.bold?'pt-2 border-t border-slate-100 font-bold':''}`}><span className="text-slate-500">{r.l}</span><span className={r.bold?'text-slate-900':'text-slate-700'}>{r.v}</span></div>)}
+            </div>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <div className="flex items-start justify-between mb-3"><div><p className="text-sm font-semibold text-slate-900">Jahresabrechnung 2025</p><p className="text-xs text-slate-400 mt-0.5">In Vorbereitung</p></div><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BC.amber}`}>Entwurf</span></div>
+            <div className="space-y-2 text-xs text-slate-500">
+              <div className="flex justify-between"><span>Einnahmen</span><span className="font-medium text-slate-900">€38.400</span></div>
+              <div className="flex justify-between"><span>Ausgaben</span><span className="font-medium text-slate-900">€41.200</span></div>
+              <div className="flex justify-between pt-2 border-t border-slate-100"><span className="font-semibold text-slate-700">Unterdeckung</span><span className="font-bold text-red-600">−€2.800</span></div>
+            </div>
+            <button className="text-xs text-blue-600 mt-3 font-semibold hover:underline">Abrechnung öffnen →</button>
+          </div>
+          <div className="bg-white rounded-2xl border border-slate-200 p-5">
+            <div className="flex items-start justify-between mb-3"><p className="text-sm font-semibold text-slate-900">Beschlusssammlung</p><button className="text-xs text-blue-600 font-medium hover:underline">+ Beschluss</button></div>
+            <div className="space-y-2">
+              {[{nr:'2025-08',text:'Dachsanierung Q3 2026 beauftragt',datum:'ETV Nov 25'},{nr:'2025-04',text:'Wirtschaftsplan 2026 genehmigt',datum:'ETV Dez 25'},{nr:'2025-02',text:'Hausordnung aktualisiert',datum:'ETV Mrz 25'}].map(b=>(
+                <div key={b.nr} className="flex items-start gap-3">
+                  <span className="text-xs font-mono text-slate-400 shrink-0 mt-0.5">{b.nr}</span>
+                  <div><p className="text-xs font-medium text-slate-900">{b.text}</p><p className="text-xs text-slate-400">{b.datum}</p></div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PORTFOLIO ─────────────────────────────────────────────────────────────
+
+  function Portfolio({ setView }) {
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+          <div className="flex items-center justify-between mb-8"><div><h1 className="text-2xl font-bold text-slate-900">Portfolio</h1><p className="text-slate-500 mt-1 text-sm">3 Liegenschaften · 22 Einheiten · 20 belegt</p></div><button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl">+ Liegenschaft</button></div>
+          <div className="space-y-4">
+            {PROPERTIES.map(p=>(
+              <button key={p.id} onClick={()=>setView('liegenschaft')} className="w-full text-left bg-white border border-slate-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all group">
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 bg-blue-50 rounded-2xl flex items-center justify-center text-xl shrink-0 group-hover:bg-blue-100 transition-colors">🏠</div>
+                  <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><h3 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{p.name}</h3><span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BC[p.type==='WEG'?'purple':'slate']}`}>{p.type}</span></div><p className="text-xs text-slate-400 mt-0.5">{p.city} · {p.units} Einheiten · {p.occupied} belegt · {p.vacant} leer</p></div>
+                  <div className="flex items-center gap-4 shrink-0"><span className="text-sm font-bold text-slate-900">{p.rent?`€${p.rent.toLocaleString('de')}/Mo`:`€${p.hausgeld.toLocaleString('de')}/Mo HG`}</span>{p.alerts>0?<span className={`text-xs font-bold px-2.5 py-1 rounded-full ${BC.amber}`}>⚠ {p.alerts}</span>:<span className={`text-xs font-bold px-2.5 py-1 rounded-full ${BC.green}`}>✓ OK</span>}</div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── KI CENTER ─────────────────────────────────────────────────────────────
+
+  function KICenter() {
+    const [expanded, setExpanded] = useState(null);
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+          <div className="flex items-center justify-between mb-8"><div><h1 className="text-2xl font-bold text-slate-900">KI-Center</h1><p className="text-slate-500 mt-1 text-sm">5 aktive Agenten · 2 Aktionen heute</p></div><button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl">+ Neuer Agent</button></div>
+          <div className="space-y-3 mb-8">
+            {AGENTS.map(a=>(
+              <div key={a.id} className={`bg-white rounded-2xl border transition-all ${expanded===a.id?'border-blue-300 shadow-sm':'border-slate-200 hover:border-slate-300'}`}>
+                <button onClick={()=>setExpanded(expanded===a.id?null:a.id)} className="w-full text-left px-5 py-4 flex items-center gap-4">
+                  <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-xl shrink-0">{a.icon}</div>
+                  <div className="flex-1 min-w-0"><div className="flex items-center gap-2"><span className="text-sm font-bold text-slate-900">{a.name}</span><span className="text-xs text-slate-400">— {a.role}</span></div><p className="text-xs text-slate-400 mt-0.5">{a.lastAction}</p></div>
+                  <div className="flex items-center gap-5 shrink-0">
+                    <div><p className="text-xs text-slate-400 mb-1">Token-Budget</p><div className="flex items-center gap-2"><div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden"><div className="h-full bg-blue-500 rounded-full" style={{width:`${a.tokenUsed}%`}}/></div><span className="text-xs text-slate-500 font-medium">{a.tokenUsed}%</span></div></div>
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${a.status==='active'?BC.green:a.status==='alert'?BC.red:BC.slate}`}>{a.status==='active'?'● Aktiv':a.status==='alert'?'⚠ Alert':'⏸ Pause'}</span>
+                    <span className="text-xs text-slate-400 w-24 text-right">{a.heartbeat}</span>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${expanded===a.id?'rotate-90':''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" d="M9 5l7 7-7 7"/></svg>
+                  </div>
+                </button>
+                {expanded===a.id && (
+                  <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Funktionen & Ablaufschritte</p>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {a.funcs.map((f,i)=><div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2"><span className="text-xs font-bold text-blue-500 w-4">{i+1}</span><span className="text-xs text-slate-700">{f}</span></div>)}
+                    </div>
+                    <div className="flex gap-2"><button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium">⏸ Pausieren</button><button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium">📋 Log ansehen</button><button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl font-medium">⚙ Konfigurieren</button></div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+          <div className="bg-slate-900 rounded-2xl p-6">
+            <div className="flex items-start gap-4 mb-5"><div className="w-10 h-10 bg-slate-700 rounded-2xl flex items-center justify-center text-xl shrink-0">🛠</div><div className="flex-1"><div className="flex items-center gap-2"><p className="text-white font-bold text-sm">Agent-Builder</p><span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full">Nur Haupteigentümer</span></div><p className="text-slate-400 text-xs mt-0.5">Neuen Agenten aus Vorlage konfigurieren oder von Grund auf anlegen.</p></div></div>
+            <div className="grid grid-cols-3 gap-3">
+              {[{n:'Wartungsagent',d:'Überwacht Intervalle, erstellt Aufgaben'},{n:'Reporting-Agent',d:'Wöchentliche Zusammenfassungen'},{n:'Kommunikationsagent',d:'Mieter-Korrespondenz verwalten'}].map(t=>(
+                <button key={t.n} className="bg-slate-800 hover:bg-slate-700 rounded-xl p-4 text-left border border-slate-700 transition-colors"><p className="text-sm font-semibold text-slate-200">{t.n}</p><p className="text-xs text-slate-500 mt-1">{t.d}</p><span className="inline-block mt-2 text-xs text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded-full">Template</span></button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── APP ───────────────────────────────────────────────────────────────────
+
+  function App() {
+    const [view, setView] = useState('dashboard');
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar view={view} setView={setView} />
+        <main className="flex-1 overflow-hidden">
+          {view==='dashboard'      && <Dashboard setView={setView} />}
+          {view==='portfolio'      && <Portfolio setView={setView} />}
+          {view==='posteingang'    && <Posteingang setView={setView} />}
+          {view==='vorgang-detail' && <VorgangDetail setView={setView} />}
+          {view==='liegenschaft'   && <LiegenschaftCockpit setView={setView} />}
+          {view==='ki-center'      && <KICenter />}
+          {view==='finanzen'       && <div className="h-full flex items-center justify-center bg-slate-50"><p className="text-slate-300">Globale Finanzübersicht · in Planung</p></div>}
+          {view==='einstellungen'  && <div className="h-full flex items-center justify-center bg-slate-50"><p className="text-slate-300">Einstellungen · in Planung</p></div>}
+        </main>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
