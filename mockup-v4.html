@@ -1,0 +1,1871 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Authaver — Mockup v2</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; box-sizing: border-box; }
+    html, body, #root { height: 100%; margin: 0; padding: 0; }
+    ::-webkit-scrollbar { width: 4px; height: 4px; }
+    ::-webkit-scrollbar-track { background: transparent; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 2px; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+  const { useState } = React;
+
+  // ─── DATA ──────────────────────────────────────────────────────────────────
+
+  const PROPERTIES = [
+    { id: 'p1', name: 'Musterstraße 4', city: 'Berlin-Mitte', type: 'Miete', units: 4, occupied: 3, vacant: 1, alerts: 2, rent: 4200 },
+    { id: 'p2', name: 'Bergweg 12', city: 'Berlin-Prenzlauer Berg', type: 'Miete', units: 6, occupied: 6, vacant: 0, alerts: 1, rent: 7800 },
+    { id: 'p3', name: 'Parkstraße 7', city: 'Berlin-Charlottenburg', type: 'WEG', units: 12, occupied: 11, vacant: 1, alerts: 1, hausgeld: 8400 },
+  ];
+
+  const AGENTS = [
+    {
+      id: 'paula', name: 'Paula', role: 'Posteingang & Klassifikation', icon: '📬',
+      status: 'active', heartbeat: 'alle 15 Min', tokenUsed: 18, tokenBudget: 100,
+      lastAction: 'vor 4 Min · 2 Mails klassifiziert',
+      funcs: ['Mail empfangen & einlesen', 'Absender identifizieren', 'Typ erkennen (Reparatur/Rechnung/Anfrage...)', 'Vorgang vorschlagen mit Confidence-Score', 'Bei < 70% Confidence → Nutzer entscheiden lassen', 'Aktion in Audit-Log schreiben'],
+    },
+    {
+      id: 'rex', name: 'Rex', role: 'Rechnungsprüfer', icon: '🔍',
+      status: 'active', heartbeat: 'bei Eingang', tokenUsed: 9, tokenBudget: 100,
+      lastAction: 'gestern · Rechnung #0089 geprüft',
+      funcs: ['Rechnung empfangen & OCR', 'Ticketabgleich prüfen', 'Betrag plausibilisieren', 'Buchungsvorschlag erstellen', 'Abweichungen flaggen', 'Freigabe anfordern'],
+    },
+    {
+      id: 'max', name: 'Max', role: 'Mahnwesen', icon: '⚡',
+      status: 'active', heartbeat: 'täglich 07:00', tokenUsed: 5, tokenBudget: 100,
+      lastAction: 'heute 07:02 · Mahnung Müller vorbereitet',
+      funcs: ['Zahlungsrückstände prüfen', 'Mahnstufe bestimmen', 'Mahnschreiben entwerfen', 'Fristen überwachen', 'Eskalation vorschlagen', 'Aktion loggen'],
+    },
+    {
+      id: 'diana', name: 'Diana', role: 'Dokumenten-Archivarin', icon: '📁',
+      status: 'active', heartbeat: 'bei Eingang', tokenUsed: 12, tokenBudget: 100,
+      lastAction: 'vor 1 Std · Protokoll archiviert',
+      funcs: ['Dokument empfangen & OCR', 'Typ klassifizieren', 'Objekt/Einheit zuordnen', 'Archivieren & verschlagworten', 'Lücken in NK-Belegen erkennen', 'Fehlende Belege anfragen'],
+    },
+    {
+      id: 'zara', name: 'Zara', role: 'Zahlungsmonitor', icon: '💳',
+      status: 'alert', heartbeat: 'täglich 06:00', tokenUsed: 1, tokenBudget: 100,
+      lastAction: 'heute 06:00 · ALARM: Miete Müller fehlt',
+      funcs: ['Kontoauszüge einlesen', 'Soll/Ist abgleichen', 'Rückstände erkennen', 'Zahlungen zuordnen', 'Rücklastschriften loggen', 'Max bei Rückstand benachrichtigen'],
+    },
+  ];
+
+  const EMAILS = [
+    {
+      id: 'e1', from: 'Thomas Müller', email: 't.mueller@gmail.com',
+      subject: 'Heizung defekt in Whg 3', time: 'Heute, 08:14', urgent: true,
+      badge: 'Reparatur', badgeColor: 'red', confidence: 94,
+      property: 'Musterstr. 4', unit: 'Whg 3', dringlichkeit: 'Hoch', kostenart: 'Heizung/Sanitär',
+      reason: 'Schlüsselwörter "Heizung defekt", Absender ist bekannter Mieter Whg 3.',
+      preview: 'Guten Morgen,\n\ndie Heizung in meiner Wohnung funktioniert seit heute früh nicht mehr. Es kommt kein warmes Wasser und die Heizkörper bleiben kalt. Bitte um schnelle Hilfe.\n\nFreundliche Grüße\nThomas Müller',
+    },
+    {
+      id: 'e2', from: 'Heizungsbau Meyer GmbH', email: 'info@heizungsbau-meyer.de',
+      subject: 'Rechnung #2026-0089 – Heizungswartung', time: 'Gestern, 16:42', urgent: false,
+      badge: 'Rechnung', badgeColor: 'amber', confidence: 98,
+      property: 'Musterstr. 4', unit: null, dringlichkeit: 'Normal', kostenart: 'Heizung/Wartung',
+      reason: 'PDF-Anhang mit Rechnungsstruktur erkannt. Bekannter Dienstleister aus Stammdaten.',
+      preview: 'Sehr geehrte Damen und Herren,\n\nim Anhang finden Sie unsere Rechnung #2026-0089 für die Heizungswartung vom 05.04.2026.\n\nGesamtbetrag: €480,00 · Fälligkeit: 30 Tage',
+    },
+    {
+      id: 'e3', from: 'Sabine Yilmaz', email: 's.yilmaz@web.de',
+      subject: 'Frage zur NK-Abrechnung 2025', time: 'Gestern, 11:23', urgent: false,
+      badge: 'Anfrage', badgeColor: 'blue', confidence: 87,
+      property: 'Musterstr. 4', unit: 'Whg 2', dringlichkeit: 'Normal', kostenart: null,
+      reason: 'Rückfrage zur Nebenkostenabrechnung erkannt. Absender ist bekannte Mieterin Whg 2.',
+      preview: 'Guten Tag,\n\nich habe Fragen zu meiner Nebenkostenabrechnung 2025. Konkret zum Posten "Hausmeisterservice" — dieser scheint im Vergleich zum Vorjahr sehr hoch. Könnten Sie mir die Belege zeigen?',
+    },
+    {
+      id: 'e4', from: 'Gebäudeversicherung AG', email: 'info@gebaeude-vers.de',
+      subject: 'Bestätigung Jahresprämie 2026', time: 'Mo, 09:05', urgent: false,
+      badge: 'Dokument', badgeColor: 'slate', confidence: 91,
+      property: null, unit: null, dringlichkeit: 'Niedrig', kostenart: 'Versicherungen',
+      reason: 'Bestätigungsmail erkannt. Kein sofortiger Handlungsbedarf. Archivierung empfohlen.',
+      preview: 'Sehr geehrte Damen und Herren,\n\nhiermit bestätigen wir den Eingang Ihrer Jahresprämie für die Gebäudeversicherung. Ihr Vertrag ist bis 31.12.2026 gültig.',
+    },
+  ];
+
+  const TASKS = [
+    { id: 'task1', color: 'blue', icon: '✓', title: 'Rechnung freigeben', desc: 'Rex: Rechnung #2026-0089 · Heizungsbau Meyer · €480', sub: 'Musterstr. 4', agent: 'Rex hat Beleg geprüft', btns: ['Freigeben', 'Ablehnen'] },
+    { id: 'task2', color: 'red', icon: '!', title: 'Mietrückstand · 14 Tage', desc: 'Müller · Whg 3 · April 2026 · €950 ausstehend', sub: 'Musterstr. 4', agent: 'Max hat Mahnung vorbereitet', btns: ['Mahnung senden', 'Zurückstellen'] },
+    { id: 'task3', color: 'amber', icon: '⟳', title: 'Wartung überfällig', desc: 'Aufzug · Bergweg 12 · letzte Wartung vor 13 Monaten', sub: 'Bergweg 12', agent: null, btns: ['Beauftragen', 'Zurückstellen'] },
+    { id: 'task4', color: 'slate', icon: '○', title: '3 Belege fehlen · NK 2025', desc: 'Diana: Hausmeister, Straßenreinigung, Gartenpflege', sub: 'Musterstr. 4', agent: 'Diana hat Liste erstellt', btns: ['Zur Checkliste'] },
+  ];
+
+  const BADGE_COLORS = {
+    red:   'bg-red-100 text-red-700',
+    amber: 'bg-amber-100 text-amber-700',
+    blue:  'bg-blue-100 text-blue-700',
+    slate: 'bg-slate-100 text-slate-600',
+    green: 'bg-green-100 text-green-700',
+    purple:'bg-purple-100 text-purple-700',
+  };
+
+  const TASK_COLORS = {
+    blue:  { bg: 'bg-blue-50', border: 'border-blue-200', icon: 'bg-blue-100 text-blue-600', btn: 'bg-blue-600 hover:bg-blue-700 text-white' },
+    red:   { bg: 'bg-red-50',  border: 'border-red-200',  icon: 'bg-red-100 text-red-600',   btn: 'bg-red-600 hover:bg-red-700 text-white' },
+    amber: { bg: 'bg-amber-50',border: 'border-amber-200',icon: 'bg-amber-100 text-amber-600',btn: 'bg-amber-600 hover:bg-amber-700 text-white' },
+    slate: { bg: 'bg-slate-50',border: 'border-slate-200',icon: 'bg-slate-100 text-slate-600',btn: 'bg-slate-700 hover:bg-slate-800 text-white' },
+  };
+
+  const MODULE_PAGES = {
+    stammdaten: {
+      title: 'Stammdaten',
+      subtitle: 'Referenzbasis fuer alle Module und zwingende Voraussetzung fuer MVP und Orchestrierung.',
+      purpose: 'Liegenschaften, Gebaeude, Einheiten, Personen, Vertrags- und Objektstammdaten zentral pflegen.',
+      status: 'Kritisch fuer MVP',
+      dependency: 'Keine fachlichen Vorbedingungen, aber Basismodul fuer alle Folgeprozesse.',
+      metrics: [
+        { label: 'Objekte', value: '3', detail: 'Liegenschaften und Gebaeude' },
+        { label: 'Einheiten', value: '22', detail: 'Eigentuemer- und Mietobjekte' },
+        { label: 'Stammdaten-Luecken', value: '4', detail: 'Zaehler und Kostenarten fehlen' },
+      ],
+      sections: [
+        { group: 'Kernelemente', items: ['Liegenschaften', 'Gebaeude', 'Einheiten', 'Eigentuemer', 'Mieter', 'Mietverhaeltnisse'] },
+        { group: 'Technik & Partner', items: ['Dienstleister', 'Zaehler', 'Bauteile / Anlagen'] },
+        { group: 'Finanz-Referenzen', items: ['Kostenstellen / Kostenarten'] },
+      ],
+      flows: ['Eigentuemer zu Einheit zuordnen', 'Mietverhaeltnis anlegen', 'Dienstleister und Anlage referenzieren'],
+    },
+    vorgaenge: {
+      title: 'Vorgaenge',
+      subtitle: 'Gemeinsamer Arbeits-, Regel- und Freigabekern fuer Reparaturen, Wartungen, Massnahmen und Rechnungen.',
+      purpose: 'Statusmodell, Aufgaben, Fristen, Eskalationen, Freigaben und Audit Trail als zentrale Orchestrierung.',
+      status: 'Neu als Hauptmodul',
+      dependency: 'Haengt operativ an Stammdaten, Dokumenten und Finanzen.',
+      metrics: [
+        { label: 'Alle Vorgaenge', value: '38', detail: 'davon 9 offen' },
+        { label: 'Freigaben', value: '5', detail: '2 ueber SLA' },
+        { label: 'Eskalationen', value: '3', detail: 'Wartung und Rueckstand' },
+      ],
+      sections: [
+        { group: 'Querschnitt', items: ['Alle Vorgaenge', 'Freigaben', 'Aufgaben', 'Fristen / Eskalationen', 'Audit Trail / Verlauf'] },
+        { group: 'Reparaturen', items: ['Offene Reparaturen', 'Ueberfaellige Reparaturen', 'Reparaturhistorie', 'Kosten je Gewerk', 'Wiederkehrende Schaeden'] },
+        { group: 'Wartungen', items: ['Wartungskalender', 'Ueberfaellige Wartungen', 'Anlagenhistorie', 'Kosten je Anlage', 'Maengel / Folgeauftraege'] },
+        { group: 'Massnahmen', items: ['Massnahmen-Cockpit', 'Budget vs. Ist', 'Zeitplan', 'Angebote / Vergabe', 'Abschlagsrechnungen', 'Nachtraege', 'Abnahmen / Restmaengel', 'Gewaehrleistung'] },
+        { group: 'Weitere Faelle', items: ['Rechnungen in Pruefung', 'Mahn- und Rueckstandsfaelle'] },
+      ],
+      flows: ['Schaden melden bis Abschluss dokumentieren', 'Wartungsintervall berechnen und Folgeauftrag erzeugen', 'Rechnung pruefen und an Finanzen uebergeben'],
+    },
+    finanzen: {
+      title: 'Finanzen',
+      subtitle: 'Forderungen, Verbindlichkeiten, Konten, Sollstellungen und Zahlungsabgleich fuer Miet- und WEG-Logik.',
+      purpose: 'Offene Posten, Bankbewegungen, Mahnwesen, Liquiditaet und Freigaben fachlich zusammenfuehren.',
+      status: 'Kritisch fuer MVP',
+      dependency: 'Nutzen aus Stammdaten, Vorgaengen, Bank und DATEV.',
+      metrics: [
+        { label: 'Offene Posten', value: '€12.450', detail: 'Forderungen und Verbindlichkeiten' },
+        { label: 'Rueckstaende', value: '€1.820', detail: 'Miete und Hausgeld' },
+        { label: 'Freigaben', value: '€4.380', detail: 'Auszahlungen in Freigabe' },
+      ],
+      sections: [
+        { group: 'Konten & Bewegungen', items: ['Kontenuebersicht', 'Bankbewegungen', 'Zahlungseingaenge', 'Ruecklastschriften'] },
+        { group: 'OP & Verpflichtungen', items: ['Offene Posten', 'Forderungen', 'Verbindlichkeiten', 'Auszahlungen in Freigabe'] },
+        { group: 'Steuerung', items: ['Mahnwesen', 'Liquiditaetsvorschau', 'Ruecklagenbewegungen', 'Mietsoll / Mietrueckstaende', 'Hausgeld-Soll / Hausgeldrueckstaende'] },
+      ],
+      flows: ['Bankimport und Zuordnung', 'Teil- und Ueberzahlungen behandeln', 'Mahnstufe auf Basis Rueckstand ansteuern'],
+    },
+    abrechnung: {
+      title: 'Abrechnung',
+      subtitle: 'Nebenkosten- und jahresbezogene Abrechnungslogik mit Kostenarten, Schluesseln, Verbrauch und Freigaben.',
+      purpose: 'Jahreslogik von Kostenaufnahme bis Entwurf, Pruefung, Freigabe und Versand abbilden.',
+      status: 'MVP+ / light',
+      dependency: 'Abhaengig von Buchungen, Kostenarten, Zeitraum, Verbrauch, Vorauszahlungen und Freigabe.',
+      metrics: [
+        { label: 'Abrechnungsjahre', value: '2', detail: '2025 in Pruefung, 2026 offen' },
+        { label: 'Pruefhinweise', value: '7', detail: 'Belege und Umlage' },
+        { label: 'Entwuerfe', value: '11', detail: '8 versandbereit' },
+      ],
+      sections: [
+        { group: 'Jahresrahmen', items: ['Abrechnungsjahre', 'Kostenartenuebersicht', 'Umlagefaehigkeit', 'Verteilerschluessel'] },
+        { group: 'Inputdaten', items: ['Verbrauchsdaten', 'Vorauszahlungen', 'Leerstand'] },
+        { group: 'Output & Qualitaet', items: ['Pruefhinweise', 'Entwuerfe', 'Freigabe', 'Versand / Rueckfragen'] },
+      ],
+      flows: ['Kostenpositionen sammeln und zuordnen', 'Pruefliste erzeugen', 'Freigabe und Versand steuern'],
+    },
+    weg: {
+      title: 'WEG',
+      subtitle: 'Getrennte WEG-Finanz-, Beschluss- und Ruecklagenlogik fuer eigentuemerbezogene Verwaltung.',
+      purpose: 'Wirtschaftsplan, Hausgeld, Eigentuemerkonten, Ruecklagen, Sonderumlagen und Jahresabrechnung fuehren.',
+      status: 'MVP+',
+      dependency: 'Haengt an Eigentuemerdaten, Sollstellungen, Bankbewegungen, Ruecklagen und Beschluessen.',
+      metrics: [
+        { label: 'Eigentuemerkonten', value: '12', detail: '1 mit Rueckstand' },
+        { label: 'Ruecklagenstand', value: '€48.300', detail: 'inkl. Bewegung 2026' },
+        { label: 'Beschluesse', value: '6', detail: '2 massnahmenrelevant' },
+      ],
+      sections: [
+        { group: 'Planung & Konten', items: ['Wirtschaftsplan', 'Eigentuemerkonten', 'Hausgeld-Soll/Ist'] },
+        { group: 'Ruecklagen & Umlagen', items: ['Ruecklagen', 'Sonderumlagen'] },
+        { group: 'Jahreswerk', items: ['Jahresabrechnung', 'Vermoegensbericht', 'Beschluesse', 'WEG-Massnahmen'] },
+      ],
+      flows: ['Hausgeld-Sollstellung verbuchen', 'Ruecklagenbewegung dokumentieren', 'Beschluss zu Massnahme verknuepfen'],
+    },
+    dokumente: {
+      title: 'Dokumente',
+      subtitle: 'Fachlich verknuepfte Akten- und Belegwelt fuer Objekte, Einheiten, Personen, Vorgaenge und Buchungen.',
+      purpose: 'Upload, OCR, Klassifikation, Verknuepfung, Suche und Vollstaendigkeit zentral abbilden.',
+      status: 'Kritisch fuer MVP',
+      dependency: 'Haengt fachlich an Stammdaten und nahezu jedem relevanten Vorgang.',
+      metrics: [
+        { label: 'Dokumente', value: '1.284', detail: 'OCR und Klassifikation aktiv' },
+        { label: 'Offene Zuordnungen', value: '14', detail: 'Posteingang und Altbestand' },
+        { label: 'Fehlende Belege', value: '3', detail: 'NK 2025 Musterstr. 4' },
+      ],
+      sections: [
+        { group: 'Akten', items: ['Objektakte', 'Einheitenakte', 'Mieterakte', 'Eigentuemerakte', 'Massnahmenakten'] },
+        { group: 'Belege & Nachweise', items: ['Rechnungsbelege', 'Wartungsnachweise', 'Beschluesse', 'Vertraege / Bescheide / Protokolle'] },
+        { group: 'Zugriff', items: ['Archiv / Suche'] },
+      ],
+      flows: ['Dokument klassifizieren und zuordnen', 'Akte aus Vorgang heraus oeffnen', 'Vollstaendigkeitsluecken erkennen'],
+    },
+    'ki-center': {
+      title: 'KI-Center',
+      subtitle: 'Automationen, Agentenstatus, Logs, Regeln und Builder fuer betriebliche Steuerung.',
+      purpose: 'Agententransparenz, Konfiguration und Freigabeschwellen zentral bedienen.',
+      status: 'Bestehend, fachlich zu erden',
+      dependency: 'Greift moduluebergreifend auf Regeln, Logs und Freigaben zu.',
+      metrics: [
+        { label: 'Aktive Agenten', value: '5', detail: '2 Aktionen heute' },
+        { label: 'Regeln', value: '18', detail: 'davon 4 mit Freigabeschwelle' },
+        { label: 'Warnungen', value: '1', detail: 'Zahlungsmonitor alert' },
+      ],
+      sections: [
+        { group: 'Steuerung', items: ['Agentenuebersicht', 'Agenten-Logs', 'Konfiguration'] },
+        { group: 'Automationen', items: ['Regeln / Automationen', 'Agent-Builder'] },
+      ],
+      flows: ['Agentenstatus pruefen', 'Freigabeschwellen anpassen', 'Neue Vorlage aus Builder starten'],
+    },
+    einstellungen: {
+      title: 'Einstellungen',
+      subtitle: 'Governance-, Rollen-, Freigabe- und Modellkonfiguration fuer das Gesamtsystem.',
+      purpose: 'Berechtigungen, Integrationen und fachliche Kataloge steuerbar machen.',
+      status: 'Ausbau noetig',
+      dependency: 'Querschnitt ueber alle Module.',
+      metrics: [
+        { label: 'Rollen', value: '7', detail: 'inkl. KI-Freigabeprofilen' },
+        { label: 'Integrationen', value: '3', detail: 'Bank, DATEV, Mail' },
+        { label: 'Regelsaetze', value: '9', detail: 'Kostenarten und Schluessel' },
+      ],
+      sections: [
+        { group: 'Governance', items: ['Rollen / Rechte', 'Freigaberegeln', 'Benachrichtigungen'] },
+        { group: 'System', items: ['Integrationen'] },
+        { group: 'Fachmodelle', items: ['Kostenartenmodell', 'Schluesselmodelle'] },
+      ],
+      flows: ['Rollen und Rechte zuweisen', 'Freigaberegel definieren', 'Kostenartenkatalog anpassen'],
+    },
+  };
+
+  const PORTFOLIO_TABS = ['Übersicht', 'Einheiten', 'Vorgänge', 'Finanzen', 'Abrechnung', 'WEG', 'Dokumente', 'Wartungen', 'Maßnahmen'];
+
+  const STAMMDATEN_NAV = [
+    { id: 'uebersicht', label: 'Uebersicht', count: '4 offen' },
+    { id: 'objekte', label: 'Objekte', count: '3' },
+    { id: 'einheiten', label: 'Einheiten', count: '22' },
+    { id: 'personen', label: 'Personen', count: '34' },
+    { id: 'mietverhaeltnisse', label: 'Mietverhaeltnisse', count: '19' },
+    { id: 'dienstleister', label: 'Dienstleister', count: '18' },
+    { id: 'zaehler', label: 'Zaehler', count: '14' },
+    { id: 'kostenarten', label: 'Kostenarten', count: '26' },
+    { id: 'datenqualitaet', label: 'Datenqualitaet', count: '4' },
+  ];
+
+  const STAMMDATEN_RECORDS = {
+    objekte: [
+      { id: 'obj-1', name: 'Musterstrasse 4', subtitle: 'Berlin-Mitte · Mietobjekt', status: '2 offene Punkte', statusTone: 'amber', meta: ['4 Einheiten', '3 belegt', '1 Gebaeude'], detailType: 'Objekt', fields: { Adresse: 'Musterstrasse 4, 10115 Berlin', Verwaltung: 'Mietverwaltung', Einheiten: '4', Eigentuemer: 'Reyk Zepper', TechnischeAnlagen: 'Heizung, Wasser, Allgemeinstrom' }, relations: ['Whg 1-4 verknuepft', '2 Dienstleister aktiv', '11 Dokumente in Objektakte'], finance: ['Mietsoll €4.200 / Monat', '2 Kostenarten fehlen fuer NK 2025'], timeline: ['Heute 08:14 Reparatur zu Whg 3 aus Posteingang erkannt', 'Gestern 16:42 Rechnung Heizungsbau Meyer dem Objekt vorgeschlagen'] },
+      { id: 'obj-2', name: 'Bergweg 12', subtitle: 'Berlin-Prenzlauer Berg · Mietobjekt', status: 'Vollstaendig', statusTone: 'green', meta: ['6 Einheiten', '6 belegt', '2 Zaehler'], detailType: 'Objekt', fields: { Adresse: 'Bergweg 12, 10405 Berlin', Verwaltung: 'Mietverwaltung', Einheiten: '6', Eigentuemer: 'RZ Holding', TechnischeAnlagen: 'Aufzug, Heizung' }, relations: ['Wartungsplan aktiv', '1 ueberfaellige Wartung', '9 Dokumente verknuepft'], finance: ['Mietsoll €7.800 / Monat', 'Alle Kostenarten gemappt'], timeline: ['Heute 06:00 Wartungsalarm fuer Aufzug erzeugt'] },
+      { id: 'obj-3', name: 'Parkstrasse 7', subtitle: 'Berlin-Charlottenburg · WEG', status: '1 Rueckfrage', statusTone: 'slate', meta: ['12 Einheiten', '11 belegt', 'WEG aktiv'], detailType: 'Objekt', fields: { Adresse: 'Parkstrasse 7, 10623 Berlin', Verwaltung: 'WEG', Einheiten: '12', Eigentuemer: '12 Eigentuemer', TechnischeAnlagen: 'Tiefgarage, Heizung' }, relations: ['Beschlussakte verknuepft', 'Ruecklagen aktiv', '12 Eigentuemerkonten'], finance: ['Hausgeld €8.400 / Monat', '1 Eigentuemerkonto in Rueckstand'], timeline: ['Gestern 11:30 Beschlussdokument archiviert'] },
+    ],
+    einheiten: [
+      { id: 'unit-3', name: 'Whg 3', subtitle: 'Musterstrasse 4 · 3. OG links', status: 'Luecke offen', statusTone: 'amber', meta: ['Mieter Thomas Mueller', '82 qm', 'Heizung Stoerung'], detailType: 'Einheit', fields: { Objekt: 'Musterstrasse 4', Nutzung: 'Wohnen', Flaeche: '82 qm', Eigentuemer: 'Reyk Zepper', Mieter: 'Thomas Mueller', Mietverhaeltnis: 'seit 01.03.2024 aktiv' }, relations: ['2 Vorgaenge offen', '6 Dokumente verknuepft', 'Zaehler Waerme fehlt'], finance: ['Miete €1.150', 'Rueckstand April 2026 €950'], timeline: ['Heute 08:14 Vorgang #V-2026-0341 erzeugt', 'Heute 06:00 Rueckstand von Zara gemeldet'] },
+      { id: 'unit-2', name: 'Whg 2', subtitle: 'Musterstrasse 4 · 2. OG rechts', status: 'Vollstaendig', statusTone: 'green', meta: ['Mieterin Sabine Yilmaz', '76 qm', 'NK-Rueckfrage'], detailType: 'Einheit', fields: { Objekt: 'Musterstrasse 4', Nutzung: 'Wohnen', Flaeche: '76 qm', Eigentuemer: 'Reyk Zepper', Mieter: 'Sabine Yilmaz', Mietverhaeltnis: 'seit 01.09.2023 aktiv' }, relations: ['1 Rueckfrage im Posteingang', '5 Dokumente verknuepft', 'Zaehler vorhanden'], finance: ['Miete €1.100', 'Keine Rueckstaende'], timeline: ['Gestern 11:23 NK-Rueckfrage erkannt'] },
+      { id: 'unit-4', name: 'Whg 4', subtitle: 'Musterstrasse 4 · DG', status: 'Neuvermietung offen', statusTone: 'slate', meta: ['Leerstand', '68 qm', 'Exposestatus offen'], detailType: 'Einheit', fields: { Objekt: 'Musterstrasse 4', Nutzung: 'Wohnen', Flaeche: '68 qm', Eigentuemer: 'Reyk Zepper', Mieter: 'Kein aktiver Mieter', Mietverhaeltnis: 'beendet zum 31.03.2026' }, relations: ['2 Dokumente verknuepft', 'Keine offenen Vorgaenge', 'Marketingdaten fehlen'], finance: ['Sollmiete geplant €1.050', 'Keine Zahlungen offen'], timeline: ['Vor 3 Tagen Auszug dokumentiert'] },
+    ],
+    personen: [
+      { id: 'person-1', name: 'Thomas Mueller', subtitle: 'Mieter · Whg 3 · Musterstrasse 4', status: 'Aktiv', statusTone: 'blue', meta: ['1 Rueckstand', '2 Dokumente neu', 'Reparatur offen'], detailType: 'Person', fields: { Rolle: 'Mieter', Kontakt: 't.mueller@gmail.com', Telefon: '0176 1234567', ZugeordnetZu: 'Whg 3 · Musterstrasse 4', Vertragsstatus: 'aktiv', Notiz: 'Praeferiert Mailkontakt' }, relations: ['1 Mietverhaeltnis', '1 Rueckstand', '1 Reparaturvorgang'], finance: ['Offen €950', 'Mahnung vorbereitet'], timeline: ['Heute 08:14 Schadenmeldung eingegangen'] },
+      { id: 'person-2', name: 'Sabine Yilmaz', subtitle: 'Mieterin · Whg 2 · Musterstrasse 4', status: 'Aktiv', statusTone: 'green', meta: ['Keine Rueckstaende', '1 Rueckfrage', 'Vollstaendig'], detailType: 'Person', fields: { Rolle: 'Mieterin', Kontakt: 's.yilmaz@web.de', Telefon: '0178 445566', ZugeordnetZu: 'Whg 2 · Musterstrasse 4', Vertragsstatus: 'aktiv', Notiz: 'Beleganfragen bevorzugt per Mail' }, relations: ['1 Mietverhaeltnis', '5 Dokumente', '1 Anfrage'], finance: ['Saldo ausgeglichen'], timeline: ['Gestern 11:23 Rueckfrage zur NK-Abrechnung'] },
+    ],
+    mietverhaeltnisse: [
+      { id: 'lease-1', name: 'MV-2024-031', subtitle: 'Thomas Mueller · Whg 3', status: 'Aktiv', statusTone: 'blue', meta: ['Start 01.03.2024', 'Kaution vollstaendig', '1 Rueckstand'], detailType: 'Mietverhaeltnis', fields: { Einheit: 'Whg 3', Mieter: 'Thomas Mueller', Beginn: '01.03.2024', Ende: 'unbefristet', Kaltmiete: '€1.150', Kaution: '€3.450 eingegangen' }, relations: ['Person und Einheit verknuepft', '2 Dokumente im Vertrag'], finance: ['Rueckstand April 2026 €950'], timeline: ['Heute 06:00 Rueckstand aktualisiert'] },
+      { id: 'lease-2', name: 'MV-2023-018', subtitle: 'Sabine Yilmaz · Whg 2', status: 'Aktiv', statusTone: 'green', meta: ['Start 01.09.2023', 'Keine Rueckstaende', 'Vollstaendig'], detailType: 'Mietverhaeltnis', fields: { Einheit: 'Whg 2', Mieter: 'Sabine Yilmaz', Beginn: '01.09.2023', Ende: 'unbefristet', Kaltmiete: '€1.100', Kaution: '€3.300 eingegangen' }, relations: ['Abrechnung 2025 vorbereitet'], finance: ['Saldo ausgeglichen'], timeline: ['Vor 2 Wochen Indexmiete geprueft'] },
+    ],
+    dienstleister: [
+      { id: 'vendor-1', name: 'Heizungsbau Meyer GmbH', subtitle: 'Gewerk Heizung / Wartung', status: 'Aktiv', statusTone: 'green', meta: ['Bekannter Dienstleister', '1 Rechnung offen', 'Objekt verknuepft'], detailType: 'Dienstleister', fields: { Gewerk: 'Heizung', Kontakt: 'info@heizungsbau-meyer.de', Telefon: '030 998877', ZugeordnetZu: 'Musterstrasse 4, Bergweg 12', Vertragsstatus: 'aktiv', Notiz: '24h Notdienst' }, relations: ['2 Objekte verknuepft', '4 Rechnungen historisch'], finance: ['Rechnung #2026-0089 €480 in Pruefung'], timeline: ['Gestern 16:42 Rechnung eingegangen'] },
+    ],
+    zaehler: [
+      { id: 'meter-1', name: 'Waermezaehler Whg 2', subtitle: 'Musterstrasse 4 · Seriennr. WM-8831', status: 'Aktiv', statusTone: 'green', meta: ['Einheit verknuepft', 'Letzte Ablesung 03/2026', 'OK'], detailType: 'Zaehler', fields: { Typ: 'Waerme', Einheit: 'Whg 2', Seriennummer: 'WM-8831', Standort: 'Bad', Status: 'aktiv', LetzteAblesung: '31.03.2026' }, relations: ['Abrechnung 2025 nutzbar'], finance: ['Verbrauchsdaten vorhanden'], timeline: ['31.03.2026 Ablesung importiert'] },
+      { id: 'meter-2', name: 'Zaehler fehlt fuer Whg 3', subtitle: 'Musterstrasse 4 · offener Stammdatensatz', status: 'Fehlt', statusTone: 'red', meta: ['Abrechnung blockiert', 'Einheit Whg 3', 'Prioritaet hoch'], detailType: 'Zaehler', fields: { Typ: 'Waerme', Einheit: 'Whg 3', Seriennummer: 'nicht hinterlegt', Standort: 'unbekannt', Status: 'offen', LetzteAblesung: 'keine' }, relations: ['Offene Datenluecke', 'Abrechnung 2025 betroffen'], finance: ['Verbrauchsschaetzung noetig wenn offen bleibt'], timeline: ['Heute 07:55 als Luecke markiert'] },
+    ],
+    kostenarten: [
+      { id: 'cost-1', name: 'Heizung / Wartung', subtitle: 'Technische Betriebskosten', status: 'Aktiv', statusTone: 'green', meta: ['Gemappt', 'ab 2024 aktiv', '4 Buchungen'], detailType: 'Kostenart', fields: { Kategorie: 'Betriebskosten', Umlage: 'umlagefaehig', Konto: 'SKR03 4360', Intervall: 'laufend', Status: 'aktiv', Kommentar: 'Wartung und Service' }, relations: ['Mit Heizungsbau Meyer verknuepft', 'Finanzen und Abrechnung nutzen diese Kostenart'], finance: ['4 Buchungen, €1.280 YTD'], timeline: ['Gestern Rechnungsvorschlag erzeugt'] },
+      { id: 'cost-2', name: 'Allgemeinstrom', subtitle: 'Kostenart fuer Objektstrom', status: 'Mapping fehlt', statusTone: 'amber', meta: ['Abrechnung blockiert', '1 Objekt betroffen', 'Prioritaet mittel'], detailType: 'Kostenart', fields: { Kategorie: 'Betriebskosten', Umlage: 'noch offen', Konto: 'nicht zugeordnet', Intervall: 'laufend', Status: 'Klärung noetig', Kommentar: 'Fehlt fuer NK 2025 Musterstrasse 4' }, relations: ['Objekt Musterstrasse 4 betroffen'], finance: ['Keine automatische Zuordnung moeglich'], timeline: ['Heute 07:40 als offener Punkt markiert'] },
+    ],
+  };
+
+  const STAMMDATEN_ISSUES = [
+    { id: 'issue-1', title: 'Waermezaehler fehlt', entity: 'Einheit Whg 3', impact: 'Verbrauch kann nicht sauber in die NK-Abrechnung 2025 fliessen.', action: 'Zaehler anlegen oder Bestand zuordnen', navId: 'zaehler', recordId: 'meter-2', severity: 'Hoch' },
+    { id: 'issue-2', title: 'Kostenart Allgemeinstrom ohne Mapping', entity: 'Objekt Musterstrasse 4', impact: 'Rechnungen koennen nicht automatisch verbucht oder verteilt werden.', action: 'Kostenart mit Konto und Umlage verknuepfen', navId: 'kostenarten', recordId: 'cost-2', severity: 'Hoch' },
+    { id: 'issue-3', title: 'Mietverhaeltnis fuer Leerstand nicht abgeschlossen', entity: 'Einheit Whg 4', impact: 'Neuvermietung und Sollstellung bleiben fachlich unscharf.', action: 'Vertragsende bestaetigen und Exposestatus setzen', navId: 'einheiten', recordId: 'unit-4', severity: 'Mittel' },
+    { id: 'issue-4', title: 'Dienstleister ohne SLA-Kennzeichnung', entity: 'Heizungsbau Meyer GmbH', impact: 'Automatische Dringlichkeit und Eskalation sind unpraezise.', action: 'Notdienst- und Reaktionszeit pflegen', navId: 'dienstleister', recordId: 'vendor-1', severity: 'Niedrig' },
+  ];
+
+  const MODULE_DEMO_CONFIG = {
+    finanzen: {
+      title: 'Demo-Logik Zahlungsabgleich',
+      subtitle: 'Wie ein lokales LLM offene Posten, Rueckstaende und manuelle Prüffälle in der Demo behandelt.',
+      stages: [
+        { step: '1', name: 'Bankbewegung einlesen', detail: 'Verwendungszweck, Betrag und Gegenkonto werden extrahiert.' },
+        { step: '2', name: 'Soll/Ist abgleichen', detail: 'Bezug zu Miete, Hausgeld oder Verbindlichkeit wird vorgeschlagen.' },
+        { step: '3', name: 'Rueckstand oder Ueberzahlung erkennen', detail: 'Unklare Faelle werden nicht automatisch verbucht.' },
+        { step: '4', name: 'Freigabe oder manuelle Pruefung', detail: 'Nur eindeutige Treffer gehen ohne Nutzerentscheidung weiter.' },
+      ],
+      scenarios: ['Mieteingang Müller April zuordnen', 'Ruecklastschrift erkennen', 'Mahnstufe fuer OP vorschlagen'],
+    },
+    dokumente: {
+      title: 'Demo-Logik Dokumentenverarbeitung',
+      subtitle: 'Wie Dokumente im Demo-Modus klassifiziert, verknuepft und auf Vollstaendigkeit geprueft werden.',
+      stages: [
+        { step: '1', name: 'Dokument lesen', detail: 'PDF, Mail-Anhang oder Scan wird OCR-seitig aufbereitet.' },
+        { step: '2', name: 'Typ klassifizieren', detail: 'Rechnung, Protokoll, Beschluss oder Wartungsnachweis wird vorgeschlagen.' },
+        { step: '3', name: 'Akte und Bezug finden', detail: 'Objekt, Einheit, Vorgang und Kostenart werden aus Kontext vorgeschlagen.' },
+        { step: '4', name: 'Luecken markieren', detail: 'Fehlende Belege oder unsichere Zuordnungen werden sichtbar gemacht.' },
+      ],
+      scenarios: ['Rechnung automatisch zur Objektakte', 'Wartungsnachweis an Anlage verknuepfen', 'Fehlenden NK-Beleg flaggen'],
+    },
+    vorgaenge: {
+      title: 'Demo-Logik Vorgangsorchestrierung',
+      subtitle: 'Wie ein lokales LLM aus Eingang, Kontext und Regeln einen strukturierten Vorgang aufsetzt.',
+      stages: [
+        { step: '1', name: 'Ausloeser uebernehmen', detail: 'Mail, Dokument oder Rueckstand wird als Vorgangsausloeser interpretiert.' },
+        { step: '2', name: 'Status, Prioritaet, Frist vorschlagen', detail: 'Regeln und Dringlichkeit steuern die Erststruktur.' },
+        { step: '3', name: 'Naechste Aufgabe erzeugen', detail: 'Freigabe, Beauftragung oder Rueckfrage wird vorbereitet.' },
+        { step: '4', name: 'Audit Trail protokollieren', detail: 'Jede Entscheidung wird mit Kontext und Confidence festgehalten.' },
+      ],
+      scenarios: ['Reparaturvorgang aus Mail anlegen', 'Wartungsfolgeauftrag erzeugen', 'Rueckstandsfall in Mahnprozess uebergeben'],
+    },
+  };
+
+  // ─── SIDEBAR ───────────────────────────────────────────────────────────────
+
+  const NAV_ITEMS = [
+    { id: 'dashboard',     label: 'Dashboard',    badge: 4 },
+    { id: 'stammdaten',    label: 'Stammdaten' },
+    { id: 'posteingang',   label: 'Posteingang',  badge: 4 },
+    { id: 'vorgaenge',     label: 'Vorgänge',     badge: 9 },
+    { id: 'finanzen',      label: 'Finanzen' },
+    { id: 'abrechnung',    label: 'Abrechnung' },
+    { id: 'weg',           label: 'WEG' },
+    { id: 'dokumente',     label: 'Dokumente' },
+    { id: 'portfolio',     label: 'Portfolio' },
+    { id: 'ki-center',     label: 'KI-Center' },
+    { id: 'einstellungen', label: 'Einstellungen' },
+  ];
+
+  const NAV_ICONS = {
+    dashboard:    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="3" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="14" y="3" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="3" y="14" width="7" height="7" rx="1.5" strokeWidth="2"/><rect x="14" y="14" width="7" height="7" rx="1.5" strokeWidth="2"/></svg>,
+    stammdaten:   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" d="M4 6h16M4 12h16M4 18h10"/><circle cx="18" cy="18" r="2" strokeWidth="2"/></svg>,
+    vorgaenge:    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" d="M9 5H7a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2V9"/><path strokeWidth="2" strokeLinecap="round" d="M9 9h6M9 13h6M15 3h6v6"/></svg>,
+    portfolio:    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9,22 9,12 15,12 15,22" strokeWidth="2"/></svg>,
+    posteingang:  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/></svg>,
+    finanzen:     <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>,
+    abrechnung:   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" d="M8 7h8M8 12h8M8 17h5"/><path strokeWidth="2" d="M6 3h12a2 2 0 012 2v14l-4-2-4 2-4-2-4 2V5a2 2 0 012-2z"/></svg>,
+    weg:          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M3 10l9-6 9 6v9a1 1 0 01-1 1h-5v-6H9v6H4a1 1 0 01-1-1v-9z"/></svg>,
+    dokumente:    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M7 3h7l5 5v13a1 1 0 01-1 1H7a2 2 0 01-2-2V5a2 2 0 012-2z"/><path strokeWidth="2" d="M14 3v5h5"/></svg>,
+    'ki-center':  <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>,
+    einstellungen:<svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"/><circle cx="12" cy="12" r="3" strokeWidth="2"/></svg>,
+  };
+
+  function Sidebar({ view, setView }) {
+    const dashboardExpanded = view === 'dashboard' || view === 'metriken';
+    return (
+      <aside className="w-56 bg-slate-900 flex flex-col h-full shrink-0">
+        <div className="px-5 py-5 border-b border-slate-800">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 bg-blue-600 rounded-lg flex items-center justify-center shrink-0">
+              <span className="text-white text-xs font-bold">A</span>
+            </div>
+            <span className="text-white font-semibold text-sm">Authaver</span>
+            <span className="ml-auto text-xs text-slate-600 font-mono">v2</span>
+          </div>
+        </div>
+        <nav className="flex-1 px-3 py-4 space-y-0.5 overflow-y-auto">
+          {NAV_ITEMS.map(item => (
+            item.id === 'dashboard' ? (
+              <div key={item.id} className="space-y-1">
+                <button
+                  onClick={() => setView(item.id)}
+                  className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                    view === item.id
+                      ? 'bg-blue-600 text-white shadow-sm'
+                      : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+                  }`}
+                >
+                  <span className="shrink-0">{NAV_ICONS[item.id]}</span>
+                  <span className="flex-1 text-left font-medium">{item.label}</span>
+                  {item.badge && (
+                    <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
+                      view === item.id ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-300'
+                    }`}>{item.badge}</span>
+                  )}
+                </button>
+                {dashboardExpanded && (
+                  <button
+                    onClick={() => setView('metriken')}
+                    className={`w-full flex items-center gap-3 pl-10 pr-3 py-2 rounded-lg text-sm transition-all ${
+                      view === 'metriken'
+                        ? 'bg-slate-800 text-white'
+                        : 'text-slate-500 hover:text-slate-100 hover:bg-slate-800'
+                    }`}
+                  >
+                    <span className="w-1.5 h-1.5 rounded-full bg-current opacity-70" />
+                    <span className="text-left font-medium">Metriken</span>
+                  </button>
+                )}
+              </div>
+            ) : (
+              <button
+                key={item.id}
+                onClick={() => setView(item.id)}
+                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm transition-all ${
+                  view === item.id
+                    ? 'bg-blue-600 text-white shadow-sm'
+                    : 'text-slate-400 hover:text-slate-100 hover:bg-slate-800'
+                }`}
+              >
+                <span className="shrink-0">{NAV_ICONS[item.id]}</span>
+                <span className="flex-1 text-left font-medium">{item.label}</span>
+                {item.badge && (
+                  <span className={`text-xs font-semibold px-1.5 py-0.5 rounded-full min-w-[20px] text-center ${
+                    view === item.id ? 'bg-blue-500 text-white' : 'bg-slate-700 text-slate-300'
+                  }`}>{item.badge}</span>
+                )}
+              </button>
+            )
+          ))}
+        </nav>
+        <div className="px-4 py-4 border-t border-slate-800">
+          <div className="flex items-center gap-3">
+            <div className="w-7 h-7 bg-gradient-to-br from-blue-500 to-blue-700 rounded-full flex items-center justify-center shrink-0">
+              <span className="text-xs text-white font-semibold">RZ</span>
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs font-medium text-slate-300 truncate">Reyk Zepper</p>
+              <p className="text-xs text-slate-500">Haupteigentümer</p>
+            </div>
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
+  // ─── DASHBOARD ─────────────────────────────────────────────────────────────
+
+  function Dashboard({ setView }) {
+    const [dismissed, setDismissed] = useState([]);
+    const tasks = TASKS.filter(t => !dismissed.includes(t.id));
+
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+
+          <div className="mb-7">
+            <h1 className="text-2xl font-bold text-slate-900">Guten Morgen, Reyk.</h1>
+            <p className="text-slate-500 mt-1 text-sm">Heute {tasks.length} Vorgänge die deine Aufmerksamkeit brauchen.</p>
+          </div>
+
+          {/* KI Summary */}
+          <div className="bg-gradient-to-r from-blue-600 to-blue-700 rounded-2xl p-5 mb-7 flex gap-4">
+            <div className="w-8 h-8 bg-blue-500 rounded-xl flex items-center justify-center text-white text-sm shrink-0 mt-0.5">✦</div>
+            <div>
+              <p className="text-white text-sm font-semibold">KI-Zusammenfassung · Heute 07:15</p>
+              <p className="text-blue-100 text-sm mt-1 leading-relaxed">
+                Paula hat 4 neue Mails klassifiziert — 1 dringende Reparatur (Heizung Whg 3, Thomas Müller), 1 Rechnung zur Freigabe (€480). Zara meldet Mietrückstand Müller, April noch offen. Max hat Mahnung Stufe 1 vorbereitet und wartet auf deine Freigabe.
+              </p>
+            </div>
+          </div>
+
+          {/* Tasks */}
+          <div className="mb-7">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Offene Aufgaben</h2>
+              <button onClick={() => setView('metriken')} className="text-xs font-medium text-blue-600 hover:text-blue-700">Zu Metriken</button>
+            </div>
+            {tasks.length === 0 ? (
+              <div className="bg-white rounded-2xl border border-slate-200 p-10 text-center">
+                <p className="text-2xl mb-2">✓</p>
+                <p className="text-slate-500 text-sm">Alles erledigt. Gute Arbeit.</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                {tasks.map(task => {
+                  const c = TASK_COLORS[task.color];
+                  return (
+                    <div key={task.id} className={`rounded-2xl border ${c.border} ${c.bg} p-5`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`w-9 h-9 rounded-xl ${c.icon} flex items-center justify-center text-base font-bold shrink-0`}>
+                          {task.icon}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-slate-900">{task.title}</p>
+                          <p className="text-xs text-slate-600 mt-1 leading-relaxed">{task.desc}</p>
+                          {task.agent && (
+                            <p className="text-xs text-blue-600 mt-1.5">✦ {task.agent}</p>
+                          )}
+                          <p className="text-xs text-slate-400 mt-0.5">🏠 {task.sub}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2 mt-4">
+                        {task.btns.map((btn, i) => (
+                          <button
+                            key={btn}
+                            onClick={() => { if (i === 0) setDismissed(d => [...d, task.id]); }}
+                            className={`text-xs px-3 py-2 rounded-lg font-semibold transition-colors ${
+                              i === 0 ? c.btn : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200'
+                            }`}
+                          >{btn}</button>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function MetricsPage() {
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-6xl mx-auto px-8 py-8">
+          <div className="flex items-start justify-between mb-6">
+            <div>
+              <div className="text-xs text-slate-400 mb-2">Dashboard › Metriken</div>
+              <h1 className="text-2xl font-bold text-slate-900">Metriken</h1>
+              <p className="text-slate-500 mt-1 text-sm">Modulübergreifende Übersicht über Volumen, Risiken und operative Schwerpunkte.</p>
+            </div>
+            <span className="text-xs text-slate-400">Live-Stand · 07.04.2026 08:20</span>
+          </div>
+
+          <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+            <div className="grid grid-cols-4 border-b border-slate-100">
+              {[
+                { label: 'Offene Vorgänge', value: '38', delta: '+6%', tone: 'text-slate-900', chip: 'vs. gestern' },
+                { label: 'Offene Freigaben', value: '5', delta: '2 kritisch', tone: 'text-amber-600', chip: 'über SLA' },
+                { label: 'Rückstände', value: '€1.820', delta: '-12%', tone: 'text-red-600', chip: 'seit Monatsstart' },
+                { label: 'Überfällige Wartungen', value: '3', delta: '1 neu', tone: 'text-blue-600', chip: 'heute erkannt' },
+              ].map(metric => (
+                <div key={metric.label} className="px-5 py-5">
+                  <p className="text-xs text-slate-400">{metric.label}</p>
+                  <p className={`text-3xl font-bold mt-2 ${metric.tone}`}>{metric.value}</p>
+                  <div className="flex items-center gap-2 mt-3">
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
+                      metric.tone === 'text-red-600' ? 'bg-red-50 text-red-600' :
+                      metric.tone === 'text-amber-600' ? 'bg-amber-50 text-amber-700' :
+                      metric.tone === 'text-blue-600' ? 'bg-blue-50 text-blue-600' :
+                      'bg-slate-100 text-slate-600'
+                    }`}>{metric.delta}</span>
+                    <span className="text-xs text-slate-400">{metric.chip}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid grid-cols-[1.5fr,1fr] gap-0">
+              <div className="px-5 py-5 border-r border-slate-100">
+                <div className="flex items-center justify-between mb-4">
+                  <p className="text-sm font-semibold text-slate-900">Kernmetriken nach Modul</p>
+                  <span className="text-xs text-slate-400">MVP-Fokus</span>
+                </div>
+                <div className="space-y-3">
+                  {[
+                    { module: 'Stammdaten', value: '4 Lücken', detail: 'Zaehler, Kostenarten, 1 Mietverhältnis', width: '30%', color: 'bg-amber-500' },
+                    { module: 'Vorgänge', value: '9 offen', detail: '3 Reparaturen, 2 Freigaben, 3 Fristen, 1 Audit-Hinweis', width: '78%', color: 'bg-blue-600' },
+                    { module: 'Finanzen', value: '€12.450 OP', detail: 'davon €1.820 Rückstände und €4.380 in Freigabe', width: '66%', color: 'bg-red-500' },
+                    { module: 'Dokumente', value: '14 offen', detail: 'Zuordnungen und 3 fehlende Belege für NK 2025', width: '52%', color: 'bg-slate-700' },
+                  ].map(row => (
+                    <div key={row.module} className="rounded-2xl border border-slate-200 p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{row.module}</p>
+                          <p className="text-xs text-slate-400 mt-0.5">{row.detail}</p>
+                        </div>
+                        <span className="text-sm font-bold text-slate-900 shrink-0">{row.value}</span>
+                      </div>
+                      <div className="h-2 bg-slate-100 rounded-full overflow-hidden mt-3">
+                        <div className={`h-full rounded-full ${row.color}`} style={{ width: row.width }} />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <div className="px-5 py-5 bg-slate-50/80">
+                <p className="text-sm font-semibold text-slate-900 mb-4">Fokus heute</p>
+                <div className="space-y-3">
+                  {[
+                    { title: '2 Freigaben überfällig', detail: 'Rechnungsprüfung und Auszahlung blockieren Folgeprozesse', tone: 'border-amber-200 bg-amber-50 text-amber-800' },
+                    { title: '1 Mietrückstand eskalationsreif', detail: 'Mahnstufe 1 vorbereitet, Zahlungseingang noch offen', tone: 'border-red-200 bg-red-50 text-red-800' },
+                    { title: '3 Belege fehlen für Abrechnung', detail: 'Hausmeister, Straßenreinigung, Gartenpflege', tone: 'border-blue-200 bg-blue-50 text-blue-800' },
+                  ].map(card => (
+                    <div key={card.title} className={`rounded-2xl border p-4 ${card.tone}`}>
+                      <p className="text-sm font-semibold">{card.title}</p>
+                      <p className="text-xs mt-1 leading-relaxed opacity-90">{card.detail}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── POSTEINGANG ───────────────────────────────────────────────────────────
+
+  function Posteingang({ setView }) {
+    const [selectedId, setSelectedId] = useState('e1');
+    const mail = EMAILS.find(e => e.id === selectedId);
+    const mailPipeline = [
+      { label: 'Eingang', value: 'Mail + PDF/Anhang erkannt', state: 'done' },
+      { label: 'Kontext', value: 'Stammdaten, Einheit und Historie geladen', state: 'done' },
+      { label: 'LLM-Vorschlag', value: 'Typ, Dringlichkeit und naechster Schritt erzeugt', state: 'done' },
+      { label: 'Regelpruefung', value: mail.confidence >= 90 ? 'Autofreigabe moeglich, aber Demo auf manuell' : 'Manuelle Pruefung noetig', state: 'active' },
+      { label: 'Ausgabe', value: 'Vorgang anlegen / Dokument zuordnen / Antwort vorbereiten', state: 'idle' },
+    ];
+
+    const primaryAction =
+      mail.badge === 'Rechnung' ? 'Pruefung starten' :
+      mail.badge === 'Dokument' ? 'Dokument zuordnen' :
+      mail.badge === 'Anfrage' ? 'Antwort vorbereiten' :
+      'Vorgang anlegen';
+
+    const recommendedAction =
+      mail.badge === 'Rechnung' ? 'Rechnungspruefung starten' :
+      mail.badge === 'Dokument' ? 'Dokument ablegen' :
+      mail.badge === 'Anfrage' ? 'Antwort vorbereiten' :
+      'Reparaturvorgang anlegen';
+
+    const recognizedAs =
+      mail.badge === 'Anfrage' ? 'Rueckfrage' :
+      mail.badge === 'Reparatur' ? 'Reparaturmeldung' :
+      mail.badge;
+
+    const nextStep =
+      mail.badge === 'Rechnung' ? 'Rechnung in Vorgang und Finanzen uebergeben' :
+      mail.badge === 'Dokument' ? 'Dokument in die passende Akte verschieben' :
+      mail.badge === 'Anfrage' ? 'Antwortentwurf fuer den Mieter vorbereiten' :
+      'Reparaturvorgang mit hoher Prioritaet anlegen';
+
+    return (
+      <div className="h-full flex overflow-hidden bg-slate-50">
+        <div className="w-64 border-r border-slate-200 bg-white flex flex-col shrink-0">
+          <div className="px-4 py-4 border-b border-slate-100">
+            <p className="text-sm font-semibold text-slate-900">Posteingang</p>
+            <p className="text-xs text-slate-400 mt-0.5">4 neue Nachrichten | Paula aktiv</p>
+          </div>
+          <div className="flex-1 overflow-y-auto">
+            {EMAILS.map(e => (
+              <button
+                key={e.id}
+                onClick={() => setSelectedId(e.id)}
+                className={`w-full text-left px-4 py-3.5 border-b border-slate-100 transition-all ${
+                  selectedId === e.id
+                    ? 'bg-blue-50 border-l-2 border-l-blue-500'
+                    : 'hover:bg-slate-50 border-l-2 border-l-transparent'
+                }`}
+              >
+                <div className="flex items-center justify-between gap-2 mb-1">
+                  <p className={`text-xs font-semibold truncate ${e.urgent ? 'text-red-600' : 'text-slate-800'}`}>{e.from}</p>
+                  <span className={`text-xs px-1.5 py-0.5 rounded-full font-medium shrink-0 ${BADGE_COLORS[e.badgeColor]}`}>{e.badge}</span>
+                </div>
+                <p className="text-xs text-slate-600 truncate">{e.subject}</p>
+                <p className="text-xs text-slate-400 mt-1">{e.time}</p>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {mail && (
+          <>
+            <div className="flex-1 overflow-y-auto border-r border-slate-200">
+              <div className="px-7 py-5 border-b border-slate-200 sticky top-0 bg-white/95 backdrop-blur z-10">
+                <h3 className="text-sm font-semibold text-slate-900">{mail.subject}</h3>
+                <p className="text-xs text-slate-400 mt-1">Von: <span className="text-slate-600">{mail.from}</span> &lt;{mail.email}&gt; | {mail.time}</p>
+              </div>
+              <div className="px-7 py-6 space-y-6">
+                <div className="bg-white rounded-3xl border border-slate-200 p-6 shadow-sm">
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                      <p className="text-lg font-semibold text-slate-900">KI-Vorschlag</p>
+                      <p className="text-sm text-slate-500 mt-1">Eine zentrale Empfehlung fuer Bearbeitung und Freigabe.</p>
+                    </div>
+                    <div className="text-right">
+                      <span className={`inline-flex text-xs font-semibold px-3 py-1.5 rounded-full ${
+                        mail.confidence >= 90 ? 'bg-green-50 text-green-700' : 'bg-amber-50 text-amber-700'
+                      }`}>
+                        {mail.confidence >= 90 ? 'Bereit zur Freigabe' : 'Bitte kurz pruefen'}
+                      </span>
+                      <p className="text-xs text-slate-400 mt-2">Confidence {mail.confidence}%</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl bg-slate-50 border border-slate-200 px-4 py-4 mb-4">
+                    <p className="text-sm text-slate-700 leading-relaxed">
+                      {recognizedAs} fuer {[mail.property, mail.unit].filter(Boolean).join(' | ')}. Empfohlene Aktion: {recommendedAction}.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Erkannt als</p>
+                      <p className="text-sm font-semibold text-slate-900 mt-2">{recognizedAs}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Bezug</p>
+                      <p className="text-sm font-semibold text-slate-900 mt-2">{[mail.property, mail.unit, mail.from].filter(Boolean).join(' | ')}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Prioritaet</p>
+                      <p className={`text-sm font-semibold mt-2 ${
+                        mail.dringlichkeit === 'Hoch' ? 'text-red-600' :
+                        mail.dringlichkeit === 'Niedrig' ? 'text-slate-500' : 'text-slate-900'
+                      }`}>{mail.dringlichkeit}</p>
+                    </div>
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Empfohlene Aktion</p>
+                      <p className="text-sm font-semibold text-slate-900 mt-2">{recommendedAction}</p>
+                    </div>
+                    {mail.kostenart && (
+                      <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                        <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Kostenart</p>
+                        <p className="text-sm font-semibold text-slate-900 mt-2">{mail.kostenart}</p>
+                      </div>
+                    )}
+                    <div className="rounded-2xl border border-slate-200 bg-white px-4 py-4">
+                      <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider">Naechster Schritt</p>
+                      <p className="text-sm font-semibold text-slate-900 mt-2">{nextStep}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-4 mt-4">
+                    <p className="text-xs font-semibold text-blue-800 uppercase tracking-wider">Begruendung</p>
+                    <p className="text-sm text-blue-800 mt-2 leading-relaxed">{mail.reason}</p>
+                  </div>
+                  <div className="mt-5 pt-5 border-t border-slate-100 flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        if (mail.badge === 'Reparatur') setView('vorgang-detail');
+                      }}
+                      className="text-sm bg-blue-600 hover:bg-blue-700 text-white px-4 py-2.5 rounded-xl transition-colors font-semibold"
+                    >
+                      {primaryAction}
+                    </button>
+                    <button className="text-sm bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl transition-colors font-medium">
+                      Bearbeiten
+                    </button>
+                    <button className="text-sm text-slate-500 hover:text-slate-700 px-1 py-2.5 transition-colors font-medium">
+                      Ablehnen
+                    </button>
+                  </div>
+                </div>
+                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+                  <div className="px-6 py-4 border-b border-slate-100">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Originalnachricht</p>
+                  </div>
+                  <div className="px-6 py-5">
+                    <p className="text-sm text-slate-700 whitespace-pre-line leading-relaxed">{mail.preview}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-80 overflow-y-auto shrink-0">
+              <div className="px-5 py-4 border-b border-slate-200 bg-white sticky top-0 z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 bg-blue-600 rounded-xl flex items-center justify-center text-white text-[10px] font-bold">AI</div>
+                  <div>
+                    <p className="text-sm font-semibold text-slate-900">Paula</p>
+                    <p className="text-xs text-slate-400">Kontext und Nachvollziehbarkeit</p>
+                  </div>
+                </div>
+              </div>
+              <div className="px-5 py-5 space-y-4">
+                <div className="bg-white rounded-2xl border border-slate-200 p-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Confidence</p>
+                    <span className={mail.confidence >= 90 ? 'text-green-600 text-sm font-semibold' : 'text-amber-600 text-sm font-semibold'}>
+                      {mail.confidence}%
+                    </span>
+                  </div>
+                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${mail.confidence >= 90 ? 'bg-green-500' : 'bg-amber-500'}`}
+                      style={{ width: `${mail.confidence}%` }}
+                    />
+                  </div>
+                  <p className="text-xs text-slate-500 mt-3">
+                    {mail.confidence >= 90 ? 'Freigabe ist plausibel, Demo bleibt manuell.' : 'Nutzerpruefung vor Ausfuehrung empfohlen.'}
+                  </p>
+                </div>
+                <div className="bg-slate-900 rounded-2xl p-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Lokale Demo-Logik</p>
+                  <div className="space-y-2">
+                    {[
+                      'Modell: Mistral 7B Instruct lokal',
+                      'Kontext: Mieter, Einheit, letzte Vorgaenge, Kostenarten',
+                      'Guardrail: keine automatische Aktion unter 90% Confidence',
+                    ].map(item => (
+                      <p key={item} className="text-xs text-slate-200 leading-relaxed">{item}</p>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 p-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Kontext</p>
+                  <div className="space-y-2.5">
+                    <Row label="Liegenschaft" val={mail.property || 'Nicht erkannt'} />
+                    <Row label="Einheit" val={mail.unit || 'Nicht erkannt'} />
+                    <Row label="Absender" val={mail.from} />
+                    {mail.kostenart && <Row label="Kostenart" val={mail.kostenart} />}
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 p-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Pipeline</p>
+                  <div className="space-y-3">
+                    {mailPipeline.map(step => (
+                      <div key={step.label} className="flex items-start gap-3">
+                        <span className={`mt-0.5 w-2.5 h-2.5 rounded-full shrink-0 ${
+                          step.state === 'done' ? 'bg-green-500' :
+                          step.state === 'active' ? 'bg-blue-500' :
+                          'bg-slate-300'
+                        }`} />
+                        <div>
+                          <p className="text-xs font-semibold text-slate-800">{step.label}</p>
+                          <p className="text-xs text-slate-500 mt-0.5 leading-relaxed">{step.value}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 p-4">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Aehnliche Faelle</p>
+                  <div className="space-y-2">
+                    {[
+                      'Whg 3: letzter Heizungsfall vor 4 Monaten',
+                      'Musterstr. 4: 2 offene Vorgangsbeziehungen',
+                      'Thomas Mueller ist als Mieter der Einheit hinterlegt',
+                    ].map(item => (
+                      <div key={item} className="text-xs text-slate-700 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  function Row({ label, val }) {
+    return (
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-xs text-slate-400 shrink-0">{label}</span>
+        <span className="text-xs font-medium text-slate-800 text-right">{val}</span>
+      </div>
+    );
+  }
+
+  // ─── VORGANG DETAIL ────────────────────────────────────────────────────────
+
+  function VorgangDetail({ setView }) {
+    const [tab, setTab] = useState('Verlauf');
+    const TABS = ['Verlauf', 'Finanzen', 'Dokumente', 'Kommunikation', 'KI-Protokoll'];
+
+    const verlauf = [
+      { time: 'Heute 08:14', actor: 'Paula (KI)', avatar: '✦', ai: true, text: 'Mail von Thomas Müller empfangen und als Reparatur klassifiziert (Confidence 94%). Liegenschaft: Musterstr. 4, Einheit: Whg 3. Vorgang angelegt, auf Bestätigung durch Eigentümer gewartet.' },
+      { time: 'Heute 08:16', actor: 'Reyk Zepper', avatar: 'RZ', ai: false, text: 'Vorgang bestätigt. Dringlichkeit auf "Hoch" gesetzt.' },
+    ];
+
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-4xl mx-auto px-8 py-8">
+
+          {/* Breadcrumb */}
+          <div className="flex items-center gap-2 text-xs text-slate-400 mb-6">
+            <button onClick={() => setView('posteingang')} className="hover:text-blue-600 transition-colors">Posteingang</button>
+            <span>›</span>
+            <span className="text-slate-600 font-medium">Vorgang #V-2026-0341</span>
+          </div>
+
+          {/* Header */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-4">
+            <div className="flex items-start justify-between gap-4">
+              <div className="flex items-start gap-4">
+                <div className="w-11 h-11 bg-red-100 rounded-2xl flex items-center justify-center text-xl shrink-0">🔧</div>
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="text-xs font-semibold text-slate-500 bg-slate-100 px-2.5 py-1 rounded-lg">Reparatur</span>
+                    <span className="text-xs text-slate-400 font-mono">#V-2026-0341</span>
+                    <span className="text-xs font-semibold text-blue-600 bg-blue-50 px-2 py-0.5 rounded-full">✦ Von Paula erstellt</span>
+                  </div>
+                  <h1 className="text-xl font-bold text-slate-900">Heizung defekt</h1>
+                  <div className="flex flex-wrap items-center gap-3 mt-2">
+                    <span className="text-xs text-slate-500">🏠 Musterstr. 4</span>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="text-xs text-slate-500">📍 Whg 3</span>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="text-xs text-slate-500">📂 Heizung/Sanitär</span>
+                    <span className="text-xs text-slate-300">·</span>
+                    <span className="text-xs text-slate-500">📅 Apr 2026</span>
+                  </div>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-bold text-amber-700 bg-amber-100 px-3 py-1.5 rounded-full">● Offen</span>
+                <button className="bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold px-4 py-2 rounded-xl transition-colors">Freigeben</button>
+              </div>
+            </div>
+
+            <div className="mt-5 pt-5 border-t border-slate-100 grid grid-cols-4 gap-4">
+              {[
+                { label: 'Verantwortlich', val: 'Reyk Zepper' },
+                { label: 'Erstellt von',   val: 'Paula (KI)' },
+                { label: 'Erstellt',       val: '07.04.2026 08:14' },
+                { label: 'Dringlichkeit',  val: '🔴 Hoch' },
+              ].map(f => (
+                <div key={f.label}>
+                  <p className="text-xs text-slate-400">{f.label}</p>
+                  <p className="text-sm font-semibold text-slate-900 mt-0.5">{f.val}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Reparatur Details */}
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-4">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-4">Reparatur-Details</p>
+            <div className="grid grid-cols-3 gap-4 mb-5">
+              {[
+                { label: 'Gewerk', val: 'Heizung / Sanitär', empty: false },
+                { label: 'Dienstleister', val: 'Noch nicht beauftragt', empty: true },
+                { label: 'Termin', val: 'Noch nicht gesetzt', empty: true },
+              ].map(f => (
+                <div key={f.label} className={`p-4 rounded-xl border ${f.empty ? 'border-dashed border-slate-200 bg-slate-50' : 'border-slate-200'}`}>
+                  <p className="text-xs text-slate-400">{f.label}</p>
+                  <p className={`text-sm font-medium mt-1 ${f.empty ? 'text-slate-300' : 'text-slate-900'}`}>{f.val}</p>
+                  <button className="text-xs text-blue-600 mt-1.5 hover:underline">Bearbeiten</button>
+                </div>
+              ))}
+            </div>
+            <div>
+              <p className="text-xs text-slate-400 mb-2">Fotos / Anhänge</p>
+              <div className="flex gap-2">
+                <div className="w-16 h-16 rounded-xl border-2 border-dashed border-slate-200 bg-slate-50 flex items-center justify-center cursor-pointer hover:border-blue-300 transition-colors">
+                  <span className="text-slate-300 text-xl font-thin">+</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-200 p-6 mb-4">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Demo-Orchestrierung</p>
+              <span className="text-xs font-medium px-2 py-1 rounded-full bg-blue-50 text-blue-600">LLM + Regeln</span>
+            </div>
+            <div className="grid grid-cols-4 gap-4">
+              {[
+                { title: 'Ausloeser', text: 'Mail aus Posteingang als Reparatur erkannt' },
+                { title: 'Kontext', text: 'Einheit, Mieter, Historie und Kostenart geladen' },
+                { title: 'Entscheidung', text: 'Dringlichkeit Hoch und Freigabe durch Eigentümer angefordert' },
+                { title: 'Folgeaktion', text: 'Dienstleistervorschlag und Dokumentverknüpfung als nächster Schritt' },
+              ].map(card => (
+                <div key={card.title} className="rounded-xl border border-slate-200 bg-slate-50 p-4">
+                  <p className="text-sm font-semibold text-slate-900">{card.title}</p>
+                  <p className="text-xs text-slate-500 mt-1 leading-relaxed">{card.text}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Tabs */}
+          <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+            <div className="flex border-b border-slate-100 overflow-x-auto">
+              {TABS.map(t => (
+                <button
+                  key={t}
+                  onClick={() => setTab(t)}
+                  className={`px-5 py-3.5 text-xs font-semibold whitespace-nowrap transition-colors ${
+                    tab === t ? 'text-blue-600 border-b-2 border-blue-600' : 'text-slate-400 hover:text-slate-600'
+                  }`}
+                >{t}</button>
+              ))}
+            </div>
+            <div className="p-6">
+              {tab === 'Verlauf' && (
+                <div className="space-y-5">
+                  {verlauf.map((item, i) => (
+                    <div key={i} className="flex gap-3">
+                      <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold shrink-0 mt-0.5 ${
+                        item.ai ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-600'
+                      }`}>{item.avatar}</div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-semibold text-slate-900">{item.actor}</span>
+                          <span className="text-xs text-slate-400">{item.time}</span>
+                        </div>
+                        <p className="text-xs text-slate-600 leading-relaxed mt-0.5">{item.text}</p>
+                      </div>
+                    </div>
+                  ))}
+                  <div className="pt-1">
+                    <input type="text" placeholder="Notiz hinzufügen..." className="w-full text-xs px-4 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-blue-400 bg-slate-50 transition-colors" />
+                  </div>
+                </div>
+              )}
+              {tab === 'KI-Protokoll' && (
+                <div className="space-y-4">
+                  <div className="bg-blue-50 border border-blue-100 rounded-xl p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <span className="text-xs font-bold text-blue-900">Paula · 07.04.2026 08:14</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_COLORS.green}`}>Confidence 94%</span>
+                    </div>
+                    <p className="text-xs text-blue-800 leading-relaxed">
+                      Typ erkannt: Reparatur. Absender Thomas Müller ist als Mieter Whg 3, Musterstr. 4 in Stammdaten hinterlegt. Schlüsselwörter: "Heizung", "defekt", "kein warmes Wasser". Dringlichkeit Hoch gesetzt. Vorgang #V-2026-0341 erstellt, Eigentümerbestätigung angefordert.
+                    </p>
+                    <div className="flex items-center gap-4 mt-3 pt-3 border-t border-blue-200">
+                      <span className="text-xs text-blue-600 font-medium">Token: 320</span>
+                      <span className="text-xs text-blue-600 font-medium">Aktion: Vorgang erstellt</span>
+                      <span className="text-xs text-blue-600 font-medium">Model: claude-sonnet</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+              {!['Verlauf', 'KI-Protokoll'].includes(tab) && (
+                <div className="text-center py-8">
+                  <p className="text-slate-300 text-sm">— Noch keine Einträge —</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ─── LIEGENSCHAFT COCKPIT ──────────────────────────────────────────────────
+
+  function LiegenschaftCockpit({ setView }) {
+    const [subNav, setSubNav] = useState('Übersicht');
+    const p = PROPERTIES[0];
+
+    const units = [
+      { label: 'Whg 1', tenant: 'Schmidt, K.', status: 'bezahlt',   rent: 950  },
+      { label: 'Whg 2', tenant: 'Yilmaz, S.', status: 'bezahlt',   rent: 1100 },
+      { label: 'Whg 3', tenant: 'Müller, T.', status: 'rückstand', rent: 1150, alerts: 2 },
+      { label: 'Whg 4', tenant: '—',          status: 'leer',      rent: null  },
+    ];
+
+    return (
+      <div className="h-full flex flex-col overflow-hidden">
+        {/* Property Header */}
+        <div className="bg-white border-b border-slate-200 px-8 pt-6 shrink-0">
+          <div className="flex items-start justify-between mb-4">
+            <div>
+              <div className="flex items-center gap-1.5 text-xs text-slate-400 mb-2">
+                <button onClick={() => setView('portfolio')} className="hover:text-blue-600 transition-colors">Portfolio</button>
+                <span>›</span>
+                <span className="text-slate-600 font-medium">{p.name}</span>
+              </div>
+              <h1 className="text-xl font-bold text-slate-900">{p.name}</h1>
+              <p className="text-sm text-slate-400 mt-0.5">{p.city} · 4 Einheiten · Mietverwaltung</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${BADGE_COLORS.amber}`}>⚠ 2 offene Vorgänge</span>
+              <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">Bearbeiten</button>
+            </div>
+          </div>
+          <div className="flex overflow-x-auto">
+            {PORTFOLIO_TABS.map(item => (
+              <button
+                key={item}
+                onClick={() => setSubNav(item)}
+                className={`px-4 py-2.5 text-sm font-semibold transition-colors border-b-2 ${
+                  subNav === item
+                    ? 'text-blue-600 border-blue-600'
+                    : 'text-slate-400 border-transparent hover:text-slate-700'
+                }`}
+              >{item}</button>
+            ))}
+          </div>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto bg-slate-50">
+          <div className="max-w-5xl mx-auto px-8 py-6">
+            {subNav === 'Übersicht' && (
+              <>
+                {/* Stats */}
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  {[
+                    { label: 'Mietsoll / Monat', val: '€4.200', sub: '3 von 4 bezahlt', col: 'text-slate-900' },
+                    { label: 'Rückstände',        val: '€950',   sub: 'Müller, Whg 3',   col: 'text-red-600' },
+                    { label: 'Offene Vorgänge',   val: '2',      sub: '1 Reparatur, 1 Rechnung', col: 'text-amber-600' },
+                    { label: 'NK 2025',           val: '3 fehlen', sub: 'Diana angefragt',  col: 'text-blue-600' },
+                  ].map(s => (
+                    <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-4">
+                      <p className="text-xs text-slate-400">{s.label}</p>
+                      <p className={`text-2xl font-bold mt-1 ${s.col}`}>{s.val}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{s.sub}</p>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Units */}
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden mb-6">
+                  <div className="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+                    <h3 className="text-sm font-semibold text-slate-900">Einheiten</h3>
+                    <button className="text-xs text-blue-600 hover:underline font-medium">+ Einheit hinzufügen</button>
+                  </div>
+                  {units.map((u, i) => (
+                    <div key={i} className={`px-5 py-4 flex items-center gap-4 ${i < units.length - 1 ? 'border-b border-slate-100' : ''}`}>
+                      <div className="w-9 h-9 bg-slate-100 rounded-xl flex items-center justify-center shrink-0">
+                        <span className="text-xs font-bold text-slate-600">{u.label.replace('Whg ', '')}</span>
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-semibold text-slate-900">{u.label}</p>
+                        <p className="text-xs text-slate-400">{u.tenant}</p>
+                      </div>
+                      <div className="text-right">
+                        {u.rent && <p className="text-sm font-bold text-slate-900">€{u.rent}</p>}
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                          u.status === 'bezahlt'   ? BADGE_COLORS.green :
+                          u.status === 'rückstand' ? BADGE_COLORS.red :
+                          BADGE_COLORS.slate
+                        }`}>
+                          {u.status === 'bezahlt' ? '✓ Bezahlt' : u.status === 'rückstand' ? '⚠ Rückstand' : 'Leer'}
+                        </span>
+                      </div>
+                      {u.alerts > 0 && (
+                        <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_COLORS.amber}`}>{u.alerts} offen</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                {/* KI Activity */}
+                <div className="bg-white rounded-2xl border border-slate-200 p-5">
+                  <h3 className="text-sm font-semibold text-slate-900 mb-4">KI-Aktivität · letzte 24h</h3>
+                  <div className="space-y-3">
+                    {[
+                      { agent: 'Paula',  text: '2 Mails klassifiziert — 1 Reparatur (Heizung), 1 Anfrage NK', time: 'vor 4 Min' },
+                      { agent: 'Rex',    text: 'Rechnung #2026-0089 geprüft, €480, Freigabe angefordert', time: 'gestern 16:45' },
+                      { agent: 'Zara',   text: 'Mietrückstand Müller erkannt, Max benachrichtigt', time: 'heute 06:00' },
+                      { agent: 'Max',    text: 'Mahnung Stufe 1 für Müller vorbereitet, wartet auf Freigabe', time: 'heute 07:02' },
+                    ].map((a, i) => (
+                      <div key={i} className="flex items-center gap-3">
+                        <span className="text-xs font-bold text-blue-600 w-12 shrink-0">{a.agent}</span>
+                        <span className="text-xs text-slate-600 flex-1">{a.text}</span>
+                        <span className="text-xs text-slate-400 shrink-0">{a.time}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </>
+            )}
+            {subNav === 'Einheiten' && (
+              <div className="space-y-6">
+                <div className="grid grid-cols-3 gap-4">
+                  {[
+                    { label: 'Einheiten gesamt', val: '4', sub: '3 vermietet, 1 leer' },
+                    { label: 'Aktive Mietverhältnisse', val: '3', sub: '1 Neuvermietung offen' },
+                    { label: 'Eigentümerzuordnung', val: '100%', sub: 'alle Einheiten referenziert' },
+                  ].map(s => (
+                    <div key={s.label} className="bg-white rounded-2xl border border-slate-200 p-4">
+                      <p className="text-xs text-slate-400">{s.label}</p>
+                      <p className="text-2xl font-bold text-slate-900 mt-1">{s.val}</p>
+                      <p className="text-xs text-slate-400 mt-0.5">{s.sub}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-white rounded-2xl border border-slate-200 overflow-hidden">
+                  <div className="grid grid-cols-4 px-5 py-3 text-xs font-semibold text-slate-400 border-b border-slate-100">
+                    <span>Einheit</span>
+                    <span>Nutzung</span>
+                    <span>Mieter / Eigentümer</span>
+                    <span>Status</span>
+                  </div>
+                  {[
+                    ['Whg 1', 'Wohnen', 'Schmidt, K.', 'Aktiv'],
+                    ['Whg 2', 'Wohnen', 'Yilmaz, S.', 'Aktiv'],
+                    ['Whg 3', 'Wohnen', 'Müller, T.', 'Rückstand'],
+                    ['Whg 4', 'Wohnen', 'Leerstand', 'Leer'],
+                  ].map((row, i) => (
+                    <div key={i} className="grid grid-cols-4 px-5 py-4 text-sm border-b border-slate-100 last:border-b-0">
+                      <span className="font-semibold text-slate-900">{row[0]}</span>
+                      <span className="text-slate-600">{row[1]}</span>
+                      <span className="text-slate-600">{row[2]}</span>
+                      <span className={`font-medium ${row[3] === 'Rückstand' ? 'text-red-600' : row[3] === 'Leer' ? 'text-slate-400' : 'text-green-600'}`}>{row[3]}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+            {subNav === 'Vorgänge' && <PortfolioPanel title="Objektbezogene Vorgänge" items={['2 offene Reparaturen', '1 Rechnung in Prüfung', '1 Wartung überfällig', 'Audit Trail für Musterstr. 4']} />}
+            {subNav === 'Finanzen' && <PortfolioPanel title="Objekt-Finanzen" items={['Mietsoll €4.200 / Monat', 'Rückstände €950', '2 Bankbewegungen offen zugeordnet', 'Liquiditätsausblick 30 Tage positiv']} />}
+            {subNav === 'Abrechnung' && <PortfolioPanel title="Objekt-Abrechnung" items={['NK 2025 in Prüfung', '3 fehlende Belege', 'Verteilerschlüssel hinterlegt', 'Entwurf für 3 Einheiten vorbereitet']} />}
+            {subNav === 'WEG' && <PortfolioPanel title="WEG-Bezug" items={['Für dieses Objekt aktuell keine aktive WEG-Logik', 'WEG-Ansichten bleiben für gemischte Portfolios verfügbar', 'Beschluss- und Rücklagenbezug kann später aktiviert werden']} />}
+            {subNav === 'Dokumente' && <PortfolioPanel title="Objekt-Dokumente" items={['Objektakte vollständig', '14 verknüpfte Rechnungsbelege', '2 Wartungsnachweise offen', 'Suche nach Einheit, Vorgang oder Kostenart']} />}
+            {subNav === 'Wartungen' && <PortfolioPanel title="Wartungen" items={['Aufzug: überfällig seit 1 Monat', 'Heizung: nächste Wartung 05/2026', 'Prüfprotokolle in Dokumenten verknüpft', '1 Mangel mit Folgeauftrag empfohlen']} />}
+            {subNav === 'Maßnahmen' && <PortfolioPanel title="Maßnahmen" items={['Keine Großmaßnahme aktiv', 'Dachprüfung im Budgetentwurf 2026', 'Angebote / Vergabe als nächster Ausbauschritt', 'Gewährleistungsfristen künftig objektbezogen sichtbar']} />}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  function PortfolioPanel({ title, items }) {
+    return (
+      <div className="bg-white rounded-2xl border border-slate-200 p-6">
+        <div className="flex items-center justify-between mb-5">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+            <p className="text-xs text-slate-400 mt-1">Liegenschafts-Cockpit für {PROPERTIES[0].name}</p>
+          </div>
+          <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">{items.length} Karten</span>
+        </div>
+        <div className="grid grid-cols-2 gap-4">
+          {items.map(item => (
+            <div key={item} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+              <p className="text-sm font-medium text-slate-800">{item}</p>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  function StammdatenWorkspace({ setView }) {
+    const [nav, setNav] = useState('uebersicht');
+    const [selectedRecordId, setSelectedRecordId] = useState('unit-3');
+    const [detailTab, setDetailTab] = useState('Stammdaten');
+
+    const navToKey = nav === 'uebersicht' || nav === 'datenqualitaet' ? 'einheiten' : nav;
+    const records = STAMMDATEN_RECORDS[navToKey] || [];
+    const selectedRecord = records.find(r => r.id === selectedRecordId) || records[0] || STAMMDATEN_RECORDS.einheiten[0];
+    const detailTabs = ['Stammdaten', 'Beziehungen', 'Finanzen', 'Historie'];
+
+    const selectRecord = (nextNav, recordId) => {
+      setNav(nextNav);
+      setSelectedRecordId(recordId);
+      setDetailTab('Stammdaten');
+    };
+
+    return (
+      <div className="h-full flex flex-col overflow-hidden bg-slate-50">
+        <div className="bg-white border-b border-slate-200 px-8 py-6 shrink-0">
+          <div className="flex items-start justify-between gap-6 mb-5">
+            <div>
+              <div className="text-xs text-slate-400 mb-2">Stammdaten · operativer Arbeitsbereich</div>
+              <h1 className="text-2xl font-bold text-slate-900">Stammdaten</h1>
+              <p className="text-sm text-slate-500 mt-1 max-w-3xl">Objekte, Einheiten, Personen und Referenzen nicht nur beschreiben, sondern aktiv pflegen, verknuepfen und auf Datenqualitaet pruefen.</p>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-2 rounded-xl transition-colors font-medium">Import</button>
+              <button className="text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl transition-colors font-semibold">+ Neu anlegen</button>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3">
+            <div className="flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-4 py-3">
+              <div className="text-xs text-slate-400 mb-1">Suche</div>
+              <div className="text-sm text-slate-500">Objekt, Einheit, Person oder Dienstleister direkt finden ...</div>
+            </div>
+            <div className="grid grid-cols-4 gap-3 w-[56%]">
+              {[
+                { label: 'Offene Luecken', value: '4', detail: '2 hoch priorisiert', tone: 'text-amber-600' },
+                { label: 'Dubletten', value: '2', detail: 'Personen & Kontakte', tone: 'text-slate-900' },
+                { label: 'Letzte Aenderungen', value: '12', detail: 'heute seit 06:00', tone: 'text-blue-600' },
+                { label: 'Abhaengige Module', value: '4', detail: 'Vorgaenge, Finanzen, Doku, NK', tone: 'text-slate-900' },
+              ].map(card => (
+                <div key={card.label} className="rounded-2xl border border-slate-200 px-4 py-3">
+                  <p className="text-xs text-slate-400">{card.label}</p>
+                  <p className={`text-xl font-bold mt-1 ${card.tone}`}>{card.value}</p>
+                  <p className="text-xs text-slate-400 mt-1">{card.detail}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="flex-1 overflow-hidden">
+          <div className="h-full max-w-[1600px] mx-auto px-8 py-6">
+            <div className="grid grid-cols-[220px,420px,1fr] gap-6 h-full">
+              <div className="bg-white rounded-3xl border border-slate-200 p-3 overflow-y-auto">
+                <div className="px-3 pt-2 pb-3">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Navigation</p>
+                </div>
+                <div className="space-y-1">
+                  {STAMMDATEN_NAV.map(item => (
+                    <button
+                      key={item.id}
+                      onClick={() => setNav(item.id)}
+                      className={`w-full flex items-center justify-between gap-3 px-3 py-3 rounded-2xl text-sm transition-all ${
+                        nav === item.id ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-slate-50'
+                      }`}
+                    >
+                      <span className="font-medium">{item.label}</span>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${nav === item.id ? 'bg-blue-500 text-white' : 'bg-slate-100 text-slate-500'}`}>{item.count}</span>
+                    </button>
+                  ))}
+                </div>
+
+                <div className="mt-6 rounded-2xl bg-slate-900 p-4">
+                  <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">Qualitaetsziel</p>
+                  <p className="text-sm text-slate-100 leading-relaxed">Stammdaten muessen so gut sein, dass Posteingang, Vorgangsanlage und Buchungsvorschlaege ohne manuelles Raten funktionieren.</p>
+                  <button onClick={() => setView('dashboard')} className="mt-4 text-xs bg-white text-slate-900 font-semibold px-3 py-2 rounded-xl">Zurueck zum Dashboard</button>
+                </div>
+              </div>
+
+              <div className="space-y-4 overflow-y-auto pr-1">
+                {(nav === 'uebersicht' || nav === 'datenqualitaet') && (
+                  <div className="bg-white rounded-3xl border border-slate-200 p-5">
+                    <div className="flex items-center justify-between gap-4 mb-4">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Datenqualitaet</p>
+                        <h3 className="text-lg font-bold text-slate-900 mt-1">Offene Punkte mit direktem Fix-Pfad</h3>
+                      </div>
+                      <span className={`text-xs font-semibold px-2.5 py-1 rounded-full ${BADGE_COLORS.amber}`}>4 offen</span>
+                    </div>
+                    <div className="space-y-3">
+                      {STAMMDATEN_ISSUES.map(issue => (
+                        <button
+                          key={issue.id}
+                          onClick={() => selectRecord(issue.navId, issue.recordId)}
+                          className="w-full text-left rounded-2xl border border-slate-200 hover:border-blue-300 hover:shadow-sm transition-all px-4 py-4"
+                        >
+                          <div className="flex items-start justify-between gap-4">
+                            <div>
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-slate-900">{issue.title}</p>
+                                <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                                  issue.severity === 'Hoch' ? BADGE_COLORS.red : issue.severity === 'Mittel' ? BADGE_COLORS.amber : BADGE_COLORS.slate
+                                }`}>{issue.severity}</span>
+                              </div>
+                              <p className="text-xs text-slate-400 mt-1">{issue.entity}</p>
+                              <p className="text-xs text-slate-600 mt-2 leading-relaxed">{issue.impact}</p>
+                            </div>
+                            <span className="text-xs font-medium text-blue-600 shrink-0">{issue.action}</span>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden">
+                  <div className="px-5 py-4 border-b border-slate-100">
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Explorer</p>
+                        <h3 className="text-base font-bold text-slate-900 mt-1">{STAMMDATEN_NAV.find(item => item.id === nav)?.label || 'Einheiten'}</h3>
+                      </div>
+                      <span className="text-xs text-slate-400">{records.length} sichtbar</span>
+                    </div>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {['Alle', 'Mit Luecken', 'Aktiv', 'Zuletzt geaendert'].map(filter => (
+                        <span key={filter} className="text-xs font-medium px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">{filter}</span>
+                      ))}
+                    </div>
+                  </div>
+                  <div className="max-h-[900px] overflow-y-auto">
+                    {records.map(record => (
+                      <button
+                        key={record.id}
+                        onClick={() => {
+                          setSelectedRecordId(record.id);
+                          setDetailTab('Stammdaten');
+                        }}
+                        className={`w-full text-left px-5 py-4 border-b border-slate-100 transition-colors ${
+                          selectedRecord?.id === record.id ? 'bg-blue-50' : 'hover:bg-slate-50'
+                        }`}
+                      >
+                        <div className="flex items-start gap-3">
+                          <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 ${
+                            selectedRecord?.id === record.id ? 'bg-blue-100 text-blue-600' : 'bg-slate-100 text-slate-500'
+                          }`}>
+                            <span className="text-xs font-bold">{record.name.slice(0, 2).toUpperCase()}</span>
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="text-sm font-semibold text-slate-900">{record.name}</p>
+                              <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${
+                                record.statusTone === 'green' ? BADGE_COLORS.green :
+                                record.statusTone === 'blue' ? BADGE_COLORS.blue :
+                                record.statusTone === 'red' ? BADGE_COLORS.red :
+                                record.statusTone === 'amber' ? BADGE_COLORS.amber :
+                                BADGE_COLORS.slate
+                              }`}>{record.status}</span>
+                            </div>
+                            <p className="text-xs text-slate-400 mt-1">{record.subtitle}</p>
+                            <div className="flex flex-wrap gap-2 mt-3">
+                              {record.meta.map(item => (
+                                <span key={item} className="text-[11px] font-medium px-2 py-1 rounded-full bg-slate-100 text-slate-600">{item}</span>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 overflow-y-auto pr-1">
+                <div className="bg-white rounded-3xl border border-slate-200 p-6">
+                  <div className="flex items-start justify-between gap-4 mb-5">
+                    <div>
+                      <div className="flex items-center gap-2 text-xs text-slate-400 mb-2">
+                        <span>{selectedRecord.detailType}</span>
+                        <span>›</span>
+                        <span className="text-slate-600 font-medium">{selectedRecord.name}</span>
+                      </div>
+                      <h2 className="text-xl font-bold text-slate-900">{selectedRecord.name}</h2>
+                      <p className="text-sm text-slate-500 mt-1">{selectedRecord.subtitle}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      <span className={`text-xs font-semibold px-3 py-1.5 rounded-full ${
+                        selectedRecord.statusTone === 'green' ? BADGE_COLORS.green :
+                        selectedRecord.statusTone === 'blue' ? BADGE_COLORS.blue :
+                        selectedRecord.statusTone === 'red' ? BADGE_COLORS.red :
+                        selectedRecord.statusTone === 'amber' ? BADGE_COLORS.amber :
+                        BADGE_COLORS.slate
+                      }`}>{selectedRecord.status}</span>
+                      <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">Bearbeiten</button>
+                    </div>
+                  </div>
+
+                  <div className="flex border-b border-slate-100 mb-5 overflow-x-auto">
+                    {detailTabs.map(tab => (
+                      <button
+                        key={tab}
+                        onClick={() => setDetailTab(tab)}
+                        className={`px-4 py-3 text-sm font-semibold border-b-2 transition-colors ${
+                          detailTab === tab ? 'text-blue-600 border-blue-600' : 'text-slate-400 border-transparent hover:text-slate-700'
+                        }`}
+                      >{tab}</button>
+                    ))}
+                  </div>
+
+                  {detailTab === 'Stammdaten' && (
+                    <div className="grid grid-cols-2 gap-4">
+                      {Object.entries(selectedRecord.fields).map(([label, value]) => (
+                        <div key={label} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4">
+                          <p className="text-xs text-slate-400">{label}</p>
+                          <p className="text-sm font-semibold text-slate-900 mt-1">{value}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {detailTab === 'Beziehungen' && (
+                    <div className="space-y-3">
+                      {selectedRecord.relations.map(item => (
+                        <div key={item} className="rounded-2xl border border-slate-200 px-4 py-4">
+                          <p className="text-sm text-slate-800">{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {detailTab === 'Finanzen' && (
+                    <div className="space-y-3">
+                      {selectedRecord.finance.map(item => (
+                        <div key={item} className="rounded-2xl border border-slate-200 px-4 py-4">
+                          <p className="text-sm text-slate-800">{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {detailTab === 'Historie' && (
+                    <div className="space-y-3">
+                      {selectedRecord.timeline.map(item => (
+                        <div key={item} className="flex items-start gap-3 rounded-2xl border border-slate-200 px-4 py-4">
+                          <span className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 text-xs font-bold flex items-center justify-center shrink-0">•</span>
+                          <p className="text-sm text-slate-700">{item}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white rounded-3xl border border-slate-200 p-5">
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Naechste Aktion</p>
+                    <p className="text-sm text-slate-800 leading-relaxed">Wenn Datensaetze sauber gepflegt sind, koennen KI und Fachlogik Zuordnungen im Posteingang, in Vorgängen und in Finanzen direkt weiterverwenden.</p>
+                    <button className="mt-4 text-xs bg-blue-600 hover:bg-blue-700 text-white px-3 py-2 rounded-xl transition-colors font-semibold">Qualitaetsregel pruefen</button>
+                  </div>
+                  <div className="bg-slate-900 rounded-3xl p-5">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-3">Abhaengige Module</p>
+                    <div className="space-y-2">
+                      {['Posteingang nutzt Identitaeten und Einheiten', 'Vorgaenge referenzieren Objekt, Anlage und Person', 'Finanzen brauchen Kostenarten und Vertragsbezug', 'Dokumente haengen an eindeutigen Stammdatenschluesseln'].map(item => (
+                        <p key={item} className="text-sm text-slate-200">{item}</p>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── KI CENTER ─────────────────────────────────────────────────────────────
+
+  function KICenter() {
+    const [expanded, setExpanded] = useState(null);
+
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">KI-Center</h1>
+              <p className="text-slate-500 mt-1 text-sm">5 aktive Funktionen · 2 Aktionen heute · Fokus auf Automationen und Fachprozesse</p>
+            </div>
+            <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors">
+              + Neue Funktion
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {[
+              { label: 'Funktionen aktiv', value: '5', detail: 'Posteingang, Prüfung, Mahnwesen, Archiv, Zahlungsmonitor' },
+              { label: 'Automationen mit Freigabe', value: '4', detail: '2 über Schwellwert, 2 vollautomatisch' },
+              { label: 'Verarbeitete Aktionen heute', value: '12', detail: 'davon 3 mit Nutzerentscheidung' },
+            ].map(card => (
+              <div key={card.label} className="bg-white rounded-2xl border border-slate-200 p-5">
+                <p className="text-xs text-slate-400">{card.label}</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{card.value}</p>
+                <p className="text-xs text-slate-400 mt-1">{card.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="space-y-3 mb-8">
+            {AGENTS.map(a => (
+              <div key={a.id} className={`bg-white rounded-2xl border transition-all ${expanded === a.id ? 'border-blue-300 shadow-sm' : 'border-slate-200 hover:border-slate-300'}`}>
+                <button
+                  onClick={() => setExpanded(expanded === a.id ? null : a.id)}
+                  className="w-full text-left px-5 py-4 flex items-center gap-4"
+                >
+                  <div className="w-10 h-10 bg-slate-100 rounded-2xl flex items-center justify-center text-xl shrink-0">{a.icon}</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-slate-900">{a.role}</span>
+                      <span className="text-xs text-slate-400">· betrieben von {a.name}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{a.lastAction}</p>
+                  </div>
+                  <div className="flex items-center gap-5 shrink-0">
+                    <div>
+                      <p className="text-xs text-slate-400 mb-1">Auslastung</p>
+                      <div className="flex items-center gap-2">
+                        <div className="w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
+                          <div className="h-full bg-blue-500 rounded-full" style={{ width: `${a.tokenUsed}%` }} />
+                        </div>
+                        <span className="text-xs text-slate-500 font-medium">{a.tokenUsed}%</span>
+                      </div>
+                    </div>
+                    <span className={`text-xs font-bold px-3 py-1.5 rounded-full ${
+                      a.status === 'active' ? BADGE_COLORS.green :
+                      a.status === 'alert'  ? BADGE_COLORS.red :
+                      BADGE_COLORS.slate
+                    }`}>
+                      {a.status === 'active' ? '● Aktiv' : a.status === 'alert' ? '⚠ Alert' : '⏸ Pause'}
+                    </span>
+                    <span className="text-xs text-slate-400 w-24 text-right">{a.heartbeat}</span>
+                    <svg className={`w-4 h-4 text-slate-400 transition-transform ${expanded === a.id ? 'rotate-90' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeWidth="2" strokeLinecap="round" d="M9 5l7 7-7 7"/></svg>
+                  </div>
+                </button>
+
+                {expanded === a.id && (
+                  <div className="px-5 pb-5 border-t border-slate-100 pt-4">
+                    <div className="flex items-center justify-between gap-4 mb-3">
+                      <div>
+                        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Funktionslogik & Ablaufschritte</p>
+                        <p className="text-xs text-slate-400 mt-1">Primäre Funktion: {a.role} · Technische Zuordnung: {a.name}</p>
+                      </div>
+                      <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-slate-100 text-slate-600">{a.heartbeat}</span>
+                    </div>
+                    <div className="flex flex-wrap gap-2 mb-4">
+                      {a.funcs.map((f, i) => (
+                        <div key={i} className="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-xl px-3 py-2">
+                          <span className="text-xs font-bold text-blue-500 w-4">{i + 1}</span>
+                          <span className="text-xs text-slate-700">{f}</span>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">Ablauf pausieren</button>
+                      <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">Funktions-Log ansehen</button>
+                      <button className="text-xs bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition-colors font-medium">Regeln konfigurieren</button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Agent Builder */}
+          <div className="bg-slate-900 rounded-2xl p-6">
+            <div className="flex items-start gap-4 mb-5">
+              <div className="w-10 h-10 bg-slate-700 rounded-2xl flex items-center justify-center text-xl shrink-0">🛠</div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <p className="text-white font-bold text-sm">Funktions-Builder</p>
+                  <span className="text-xs bg-slate-700 text-slate-400 px-2 py-0.5 rounded-full">Nur Haupteigentümer</span>
+                </div>
+                <p className="text-slate-400 text-xs mt-0.5">Neue KI-Funktion aus Vorlage konfigurieren oder vorhandene Automationen fachlich erweitern.</p>
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { name: 'Wartungssteuerung', desc: 'Überwacht Intervalle, erstellt Aufgaben und Folgeaufträge' },
+                { name: 'Reporting & Kennzahlen', desc: 'Erstellt periodische Übersichten für Portfolio und Führung' },
+                { name: 'Kommunikationslogik', desc: 'Erzeugt Antwortentwürfe und priorisiert Rückfragen' },
+              ].map(t => (
+                <button key={t.name} className="bg-slate-800 hover:bg-slate-700 rounded-xl p-4 text-left border border-slate-700 transition-colors">
+                  <p className="text-sm font-semibold text-slate-200">{t.name}</p>
+                  <p className="text-xs text-slate-500 mt-1">{t.desc}</p>
+                  <span className="inline-block mt-2 text-xs text-blue-400 bg-blue-900/30 px-2 py-0.5 rounded-full">Funktionsvorlage</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+        </div>
+      </div>
+    );
+  }
+
+  // ─── PORTFOLIO ─────────────────────────────────────────────────────────────
+
+  function Portfolio({ setView }) {
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-5xl mx-auto px-8 py-8">
+          <div className="flex items-center justify-between mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">Portfolio</h1>
+              <p className="text-slate-500 mt-1 text-sm">3 Liegenschaften · 22 Einheiten · 20 belegt · 2 leer</p>
+            </div>
+            <button className="bg-blue-600 hover:bg-blue-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl transition-colors">
+              + Liegenschaft
+            </button>
+          </div>
+          <div className="space-y-4">
+            {PROPERTIES.map(p => (
+              <button
+                key={p.id}
+                onClick={() => setView('liegenschaft')}
+                className="w-full text-left bg-white border border-slate-200 rounded-2xl p-5 hover:border-blue-300 hover:shadow-sm transition-all group"
+              >
+                <div className="flex items-center gap-4">
+                  <div className="w-11 h-11 bg-blue-50 rounded-2xl flex items-center justify-center text-xl shrink-0 group-hover:bg-blue-100 transition-colors">🏠</div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2">
+                      <h3 className="text-sm font-bold text-slate-900 group-hover:text-blue-600 transition-colors">{p.name}</h3>
+                      <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${BADGE_COLORS[p.type === 'WEG' ? 'purple' : 'slate']}`}>{p.type}</span>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-0.5">{p.city} · {p.units} Einheiten · {p.occupied} belegt · {p.vacant} leer</p>
+                  </div>
+                  <div className="flex items-center gap-4 shrink-0">
+                    <span className="text-sm font-bold text-slate-900">
+                      {p.rent ? `€${p.rent.toLocaleString('de')}/Mo` : `€${p.hausgeld.toLocaleString('de')}/Mo HG`}
+                    </span>
+                    {p.alerts > 0
+                      ? <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${BADGE_COLORS.amber}`}>⚠ {p.alerts} offen</span>
+                      : <span className={`text-xs font-bold px-2.5 py-1 rounded-full ${BADGE_COLORS.green}`}>✓ OK</span>
+                    }
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── MODULE PAGES ──────────────────────────────────────────────────────────
+
+  function ModulePage({ page, setView, pageKey }) {
+    const demoConfig = MODULE_DEMO_CONFIG[pageKey];
+    return (
+      <div className="h-full overflow-y-auto bg-slate-50">
+        <div className="max-w-6xl mx-auto px-8 py-8">
+          <div className="flex items-start justify-between gap-6 mb-8">
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{page.title}</h1>
+              <p className="text-slate-500 mt-1 text-sm max-w-3xl">{page.subtitle}</p>
+            </div>
+            <div className="rounded-2xl border border-slate-200 bg-white px-4 py-3 min-w-[220px]">
+              <p className="text-xs text-slate-400">Status</p>
+              <p className="text-sm font-semibold text-slate-900 mt-1">{page.status}</p>
+              <p className="text-xs text-slate-400 mt-2">{page.dependency}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-3 gap-4 mb-6">
+            {page.metrics.map(metric => (
+              <div key={metric.label} className="bg-white rounded-2xl border border-slate-200 p-5">
+                <p className="text-xs text-slate-400">{metric.label}</p>
+                <p className="text-2xl font-bold text-slate-900 mt-1">{metric.value}</p>
+                <p className="text-xs text-slate-400 mt-0.5">{metric.detail}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="grid grid-cols-[1.6fr,1fr] gap-6 mb-6">
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Funktionslandkarte</p>
+              <p className="text-sm text-slate-600 leading-relaxed mb-5">{page.purpose}</p>
+              <div className="space-y-4">
+                {page.sections.map(section => (
+                  <div key={section.group}>
+                    <p className="text-sm font-semibold text-slate-900 mb-2">{section.group}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {section.items.map(item => (
+                        <span key={item} className="text-xs font-medium px-3 py-2 rounded-xl bg-slate-50 border border-slate-200 text-slate-700">{item}</span>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-6">
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Zwingende Abhängigkeit</p>
+                <p className="text-sm text-slate-700 leading-relaxed">{page.dependency}</p>
+              </div>
+              <div className="bg-white rounded-2xl border border-slate-200 p-6">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">Leitprozesse</p>
+                <div className="space-y-3">
+                  {page.flows.map((flow, index) => (
+                    <div key={flow} className="flex items-start gap-3">
+                      <span className="w-6 h-6 rounded-full bg-blue-50 text-blue-600 text-xs font-bold flex items-center justify-center shrink-0">{index + 1}</span>
+                      <p className="text-sm text-slate-700">{flow}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              <div className="bg-slate-900 rounded-2xl p-6">
+                <p className="text-xs font-semibold uppercase tracking-wider text-slate-500 mb-2">MVP Einordnung</p>
+                <p className="text-sm text-slate-100 leading-relaxed">{page.status}</p>
+                <button onClick={() => setView('dashboard')} className="mt-4 text-xs bg-white text-slate-900 font-semibold px-3 py-2 rounded-xl">Zurueck zum Dashboard</button>
+              </div>
+            </div>
+          </div>
+
+          {demoConfig && (
+            <div className="bg-white rounded-2xl border border-slate-200 p-6">
+              <div className="flex items-start justify-between gap-4 mb-5">
+                <div>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Demo mit lokalem LLM</p>
+                  <h3 className="text-lg font-bold text-slate-900">{demoConfig.title}</h3>
+                  <p className="text-sm text-slate-500 mt-1">{demoConfig.subtitle}</p>
+                </div>
+                <span className="text-xs font-medium px-2.5 py-1 rounded-full bg-blue-50 text-blue-600">Demo-Ready</span>
+              </div>
+              <div className="grid grid-cols-[1.5fr,1fr] gap-6">
+                <div className="space-y-3">
+                  {demoConfig.stages.map(stage => (
+                    <div key={stage.step} className="rounded-2xl border border-slate-200 p-4">
+                      <div className="flex items-start gap-3">
+                        <span className="w-7 h-7 rounded-full bg-blue-50 text-blue-600 text-xs font-bold flex items-center justify-center shrink-0">{stage.step}</span>
+                        <div>
+                          <p className="text-sm font-semibold text-slate-900">{stage.name}</p>
+                          <p className="text-xs text-slate-500 mt-1">{stage.detail}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <div className="bg-slate-50 rounded-2xl border border-slate-200 p-5">
+                  <p className="text-sm font-semibold text-slate-900 mb-3">Demo-Szenarien</p>
+                  <div className="space-y-2">
+                    {demoConfig.scenarios.map(item => (
+                      <div key={item} className="text-xs text-slate-700 bg-white border border-slate-200 rounded-xl px-3 py-2">{item}</div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  function Placeholder({ label }) {
+    return (
+      <div className="h-full flex items-center justify-center bg-slate-50">
+        <p className="text-slate-300 text-sm">{label} · in Planung</p>
+      </div>
+    );
+  }
+
+  // ─── APP ───────────────────────────────────────────────────────────────────
+
+  function App() {
+    const [view, setView] = useState('dashboard');
+    return (
+      <div className="flex h-screen overflow-hidden">
+        <Sidebar view={view} setView={setView} />
+        <main className="flex-1 overflow-hidden">
+          {view === 'dashboard'     && <Dashboard setView={setView} />}
+          {view === 'metriken'      && <MetricsPage />}
+          {view === 'stammdaten'    && <StammdatenWorkspace setView={setView} />}
+          {view === 'portfolio'     && <Portfolio setView={setView} />}
+          {view === 'posteingang'   && <Posteingang setView={setView} />}
+          {view === 'vorgaenge'     && <ModulePage page={MODULE_PAGES.vorgaenge} pageKey="vorgaenge" setView={setView} />}
+          {view === 'vorgang-detail'&& <VorgangDetail setView={setView} />}
+          {view === 'liegenschaft'  && <LiegenschaftCockpit setView={setView} />}
+          {view === 'finanzen'      && <ModulePage page={MODULE_PAGES.finanzen} pageKey="finanzen" setView={setView} />}
+          {view === 'abrechnung'    && <ModulePage page={MODULE_PAGES.abrechnung} pageKey="abrechnung" setView={setView} />}
+          {view === 'weg'           && <ModulePage page={MODULE_PAGES.weg} pageKey="weg" setView={setView} />}
+          {view === 'dokumente'     && <ModulePage page={MODULE_PAGES.dokumente} pageKey="dokumente" setView={setView} />}
+          {view === 'ki-center'     && <KICenter />}
+          {view === 'einstellungen' && <ModulePage page={MODULE_PAGES.einstellungen} pageKey="einstellungen" setView={setView} />}
+        </main>
+      </div>
+    );
+  }
+
+  ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+  </script>
+</body>
+</html>
